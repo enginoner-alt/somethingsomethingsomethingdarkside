@@ -3,17 +3,38 @@
 {% block content %}
 <section class="card narrow">
   <h1>{{ t("login.title") }}</h1>
-  {% if error %}<p class="error" role="alert">{{ t("login.error") }}</p>{% endif %}
+  {% if error %}<p class="error" role="alert">{{ t("login.error." ~ error) }}</p>{% endif %}
+
+  {% if cfg.oidc_enabled %}
+    <a class="button primary block" href="/auth/oidc/login?next={{ next | urlencode }}">
+      {{ t("login.sso", label=cfg.oidc_button_label) }}
+    </a>
+  {% endif %}
+
+  {% set local_form %}
   <form method="post" action="/login" class="stack">
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
     <input type="hidden" name="next" value="{{ next }}">
     <label>{{ t("login.username") }}
-      <input name="username" autocomplete="username" required autofocus>
+      <input name="username" autocomplete="username" required {% if not cfg.oidc_enabled %}autofocus{% endif %}>
     </label>
     <label>{{ t("login.password") }}
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
-    <button class="primary">{{ t("login.submit") }}</button>
+    <button class="{{ '' if cfg.oidc_enabled else 'primary' }}">{{ t("login.submit") }}</button>
   </form>
+  {% endset %}
+
+  {% if cfg.oidc_enabled and cfg.local_login_mode == "break_glass_only" %}
+    <details class="break-glass">
+      <summary class="muted">{{ t("login.break_glass") }}</summary>
+      {{ local_form }}
+    </details>
+  {% elif cfg.oidc_enabled %}
+    <p class="divider muted">{{ t("login.or") }}</p>
+    {{ local_form }}
+  {% else %}
+    {{ local_form }}
+  {% endif %}
 </section>
 {% endblock %}

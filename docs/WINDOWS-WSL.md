@@ -165,6 +165,13 @@ login page with a valid certificate.
   `wsl.exe -d Ubuntu-24.04 --exec true`.
 - **Laptop sleep kills recordings.** If the laptop sleeps mid-meeting, uploads
   stop. Set "When plugged in, put my device to sleep" to **Never** while testing.
+- **Check that the app sees real client IPs.** Login throttling counts
+  failures per client IP. After a few wrong passwords, check what was recorded:
+  `docker compose exec postgres psql -U darkside -c "select ip, count(*) from login_failures group by ip"`.
+  If every device shows the *same* address (possible with Docker Desktop or
+  some WSL networking setups), the per-IP limit (20 failures in 15 minutes)
+  applies to everyone at once. That's fine for a POC, but tell me and I'll
+  adjust it.
 - **Ports 80/443 already in use?** Something on Windows (IIS, Skype, another
   web server) may hold them. Find the culprit with
   `netstat -ano | findstr ":443"`.

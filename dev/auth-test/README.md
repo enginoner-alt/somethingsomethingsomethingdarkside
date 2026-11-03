@@ -1,0 +1,142 @@
+# Auth test harness (OpenLDAP → Keycloak → app)
+
+**Test harness only. Not part of the POC or production deployment.**
+
+This proves the app's SSO side end to end with a dummy directory:
+
+```
+OpenLDAP (seed.ldif)  →  Keycloak (LDAP federation, TOTP required)  →  OIDC  →  app
+```
+
+Production with Active Directory has the same shape. Only Keycloak's LDAP
+provider settings change (see [Pointing it at AD](#pointing-it-at-ad)). The app
+needs no changes.
+
+## What it checks
+
+`e2e.cjs` (Playwright) runs these checks:
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | `jdoe` first SSO login | forced TOTP enrolment, then lands in the app; name from LDAP |
+| 2 | `jdoe` is in `darkside-admins` | admin panel allowed |
+| 3 | log out | Keycloak session ends too; password asked again |
+| 4 | `jdoe` second login | password **and** TOTP code required |
+| 5 | `asmith` (users group only) | logs in, `/admin` is 403 |
+| 6 | `mallory` (valid LDAP, not in `darkside-users`) | refused by the app |
+| 7 | `asmith` removed from the group in LDAP | refused at next login |
+| 8 | `mallory` deleted from LDAP | Keycloak rejects the login |
+| 9 | SSO username on the local form | no local password, rejected |
+| 10 | break-glass `admin` on the local form | works |
+
+`e2e-idp-down.cjs` runs with Keycloak **stopped**: the SSO button fails
+gracefully, and the break-glass admin can still log in.
+
+Last run in the Claude sandbox: all checks pass (Keycloak 26.0.7, OpenLDAP slapd 2.6, Chromium).
+
+## Dummy accounts (seed.ldif)
+
+All LDAP passwords: `Passw0rd!`
+
+| user | groups |
+|------|--------|
+| `jdoe` (Jane Doe) | `darkside-users`, `darkside-admins` |
+| `asmith` (Alan Smith) | `darkside-users` |
+| `mallory` | none |
+
+## Running it
+
+You need OpenLDAP (`slapd`, `ldap-utils`), Keycloak 26 (container or the
+release tarball + Java 21), Node + Playwright, and the app.
+
+1. **OpenLDAP** with base DN `dc=darkside,dc=test`, admin
+   `cn=admin,dc=darkside,dc=test` / `ldap-admin-pw`. Then:
+
+   ```bash
+   ./reseed-ldap.sh
+   ```
+
+2. **Keycloak** in dev mode on port 8080. With Docker (this exact command is untested: the sandbox couldn't reach quay.io, so the recorded run used the release tarball):
+
+   ```bash
+   docker run -d --name kc-test --network host -e KC_BOOTSTRAP_ADMIN_USERNAME=kcadmin -e KC_BOOTSTRAP_ADMIN_PASSWORD=kcadmin-pw quay.io/keycloak/keycloak:26.0.7 start-dev --http-port 8080 --hostname http://localhost:8080
+   ```
+
+   Then configure it. **This deletes and recreates the `darkside` realm:**
+
+   ```bash
+   KCADM="docker exec kc-test /opt/keycloak/bin/kcadm.sh" ./configure-keycloak.sh
+   ```
+
+   (With the tarball, use `KCADM=/path/to/keycloak/bin/kcadm.sh`.)
+
+3. **App** on `http://localhost:8000` with these settings (in addition to
+   the database settings and `SECRET_KEY`):
+
+   ```
+   SESSION_COOKIE_SECURE=false          # plain HTTP in this harness only
+   AUTHLIB_INSECURE_TRANSPORT=1         # lets OIDC talk to http://localhost:8080
+   BOOTSTRAP_ADMIN_PASSWORD=admin-password-123
+   OIDC_ISSUER=http://localhost:8080/realms/darkside
+   OIDC_CLIENT_ID=darkside
+   OIDC_CLIENT_SECRET=darkside-test-secret
+   OIDC_REQUIRED_GROUP=darkside-users
+   OIDC_ADMIN_GROUP=darkside-admins
+   OIDC_BUTTON_LABEL=Keycloak
+   ```
+
+   Never use the first two outside this harness.
+
+4. **Run** (from a clean app database, since TOTP enrolment happens only once per user):
+
+   ```bash
+   node e2e.cjs
+   ```
+
+   Stop Keycloak, then:
+
+   ```bash
+   node e2e-idp-down.cjs
+   ```
+
+To rerun, repeat `reseed-ldap.sh` and `configure-keycloak.sh`, and empty the
+app's `users` table.
+
+## Things the harness taught us (apply to production too)
+
+- **Keycloak caches LDAP group membership.** With the default cache, a user
+  removed from `darkside-users` could still log in. The harness sets the LDAP
+  provider's **cache policy to `NO_CACHE`**, which makes group changes apply at
+  the next login. Do the same with AD. At your user count the extra LDAP
+  queries don't matter.
+- **Group changes apply at the next login, not instantly.** The app reads
+  groups when someone logs in. An existing app session lasts until its idle
+  timeout (2 h by default) or absolute limit (12 h). To cut someone off
+  immediately, also click **Disable** in the app's admin panel: that ends their
+  sessions at once.
+- **The default "first name" mapper reads `cn`** for generic LDAP, which
+  doubled surnames ("Alan Smith Smith"). The script maps it to `givenName`.
+  The AD vendor preset already does this correctly.
+- **Making OTP mandatory:** set the "Browser - Conditional OTP" sub-flow to
+  REQUIRED and disable its "Condition - user configured" step. Send the full
+  execution object when updating it, or Keycloak resets its priority and asks
+  for OTP *before* the password.
+
+## Pointing it at AD
+
+In Keycloak's LDAP provider, the differences from this harness are:
+
+| setting | OpenLDAP (harness) | Active Directory |
+|---|---|---|
+| vendor | `other` | `ad` |
+| connection URL | `ldap://…:389` | `ldaps://dc.example.local:636` |
+| username attribute | `uid` | `sAMAccountName` |
+| RDN attribute | `uid` | `cn` |
+| UUID attribute | `entryUUID` | `objectGUID` |
+| user object classes | `inetOrgPerson` | `person, organizationalPerson, user` |
+| users DN | `ou=people,…` | your users OU |
+| bind DN | LDAP admin | a read-only service account |
+| group mapper object class | `groupOfNames` | `group` |
+| cache policy | `NO_CACHE` | `NO_CACHE` |
+
+In AD, a disabled account (`userAccountControl`) is refused by Keycloak automatically.

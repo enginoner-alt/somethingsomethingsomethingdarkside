@@ -80,3 +80,12 @@ th { color: var(--muted); font-weight: 600; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
+a.button {
+  display: inline-block; text-align: center; text-decoration: none; font: inherit;
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+}
+a.button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.block { display: block; width: 100%; }
+.divider { text-align: center; margin: 16px 0; font-size: 0.9rem; }
+.break-glass { margin-top: 20px; }
+.break-glass summary { cursor: pointer; font-size: 0.9rem; margin-bottom: 12px; }

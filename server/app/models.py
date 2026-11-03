@@ -1,25 +1,64 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, utcnow
 
 
+class AuthSource:
+    LOCAL = "local"
+    OIDC = "oidc"
+
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("oidc_issuer", "oidc_subject", name="uq_users_oidc_identity"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(150), unique=True)
     display_name: Mapped[str | None] = mapped_column(String(200))
-    # Null for users that only log in via OIDC (M4).
+    # Null for users that only log in via OIDC.
     password_hash: Mapped[str | None] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     locale: Mapped[str | None] = mapped_column(String(10))
+    auth_source: Mapped[str] = mapped_column(String(10), default=AuthSource.LOCAL)
+    # OIDC identity: (issuer, subject) is the stable key, never the username.
+    oidc_issuer: Mapped[str | None] = mapped_column(String(500))
+    oidc_subject: Mapped[str | None] = mapped_column(String(255))
+    # Bumped to revoke all of this user's sessions (disable, password reset).
+    auth_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LoginFailure(Base):
+    """One row per failed local login, for throttling. Old rows are pruned."""
+
+    __tablename__ = "login_failures"
+    __table_args__ = (
+        Index("ix_login_failures_ip_created", "ip", "created_at"),
+        Index("ix_login_failures_user_ip", "username", "ip"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(150))
+    ip: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class JobStatus:

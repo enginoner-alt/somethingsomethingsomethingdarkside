@@ -17,7 +17,27 @@ Testers: owner + Claude. Target hardware: laptop, RTX 4060 8 GB, 16 GB RAM.
 **Done when:** `docker compose up` → login page over HTTPS on your domain;
 admin logs in; a test job goes queued → done.
 
-## M1 — Capture
+## M1 — Safe login
+Priority order (owner decision): **safe login first, then record and push.**
+
+- Local login hardening: brute-force throttling per username and per IP,
+  idle session timeout, sessions revoked when a user is disabled or their
+  password changes.
+- `LOCAL_LOGIN_MODE`: `all` (POC default) or `break_glass_only` (only the
+  bootstrap admin may use a password once SSO is in place).
+- Optional OIDC login (off unless configured): PKCE + nonce, users matched by
+  issuer + subject (never by username), optional required group, IdP group →
+  admin role, logout also ends the IdP session.
+- Test harness (**sandbox/dev only, not part of the POC deployment**):
+  OpenLDAP with dummy users and groups → Keycloak (LDAP federation, TOTP MFA) → app.
+
+**Done when:** in the harness, an LDAP user logs in through Keycloak with TOTP;
+the admin group grants admin; a user removed from the required group or deleted
+from LDAP can't log in; local login is throttled after repeated failures; and the
+break-glass admin still works when the IdP is down. Production AD = Keycloak
+(or another IdP) configuration only, no app changes.
+
+## M2 — Record and push
 - Mic picker (`enumerateDevices`), level meter, browser-DSP toggle (default off).
 - Consent notice before recording.
 - Chunked recording/upload with retry, pause/resume, Wake Lock.
@@ -30,7 +50,7 @@ admin logs in; a test job goes queued → done.
 intact from: Linux, Windows, Android, iOS. Pulling the network for ~30 s
 mid-recording loses no audio. XVF3800 channel behaviour documented.
 
-## M2 — Transcription
+## M3 — Transcription
 - WhisperX worker image (CUDA), models cached in a volume, HF token from env.
 - Transcribe → align → diarize full recording; store segments, words, speaker embeddings.
 - Admin settings: model, compute type, batch size, default language, diarization, speaker hints.
@@ -42,7 +62,7 @@ mid-recording loses no audio. XVF3800 channel behaviour documented.
 speakers) are transcribed and diarized on the 4060 without OOM; processing time
 recorded in README.
 
-## M3 — Insights
+## M4 — Insights
 - Admin: LLM endpoints (URL, model, key, context size, purpose), GPU-sharing toggle.
 - Templates: global (admin) + personal (user); sensible defaults
   (summary, action items, decisions, open questions).
@@ -51,18 +71,9 @@ recorded in README.
 - Transcript edit → user prompted → change-check (diff size, then small LLM call
   on the diff) → user decides whether to regenerate.
 
-**Done when:** default templates produce useful output on the M2 meetings;
+**Done when:** default templates produce useful output on the M3 meetings;
 GPU-sharing toggle verified with LLM on the same 4060 (no OOM).
 
-## M4 — Auth & admin hardening
-- OIDC login (tested against Keycloak or Authentik federated to AD, with MFA).
-- IdP group → role mapping (e.g. `meeting-admins` → admin).
-- Local login can be disabled except break-glass admin.
-- "Download all my data" zip; trash purge job verified.
-
-**Done when:** AD user logs in through the IdP with MFA; group-based admin works;
-user deletes everything and nothing remains on disk/DB after purge.
-
-## M5 — Later (not scheduled)
-Cross-recording search/Q&A, voiceprint speaker suggestions, multiple workers,
+## Later (not scheduled)
+"Download all my data" zip, trash purge job verification, Cross-recording search/Q&A, voiceprint speaker suggestions, multiple workers,
 DOCX export.

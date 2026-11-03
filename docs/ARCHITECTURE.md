@@ -19,7 +19,7 @@ its place in the POC. Anything else goes in "Later".
 | D6 | Languages (UI) | English + Turkish, one JSON file per language in `locales/`. Adding a language = adding a file. |
 | D7 | LLM | Local, OpenAI-compatible endpoint(s), configured in admin panel. Multiple endpoints supported, each assigned to a purpose. |
 | D8 | GPU sharing | Admin toggle "LLM shares GPU with WhisperX". When on: worker unloads models after each job and transcription/LLM jobs never overlap. Default: off (assume separate). |
-| D9 | Auth | Local accounts (POC) → OIDC (M4). AD + MFA/SSO handled by an IdP (Keycloak/Authentik with AD federation); the app only speaks OIDC. A local break-glass admin always exists. |
+| D9 | Auth | Local accounts (POC, hardened) + optional OIDC (M1). AD + MFA/SSO handled by an IdP (Keycloak/Authentik with AD federation); the app only speaks OIDC. A local break-glass admin always exists. |
 | D10 | TLS | Caddy reverse proxy with the user-provided wildcard cert mounted as files. |
 | D11 | Sharing | None in-app. Users can download their own data (audio, transcript, insights). |
 | D12 | Admin visibility | Admin panel manages settings/users/quotas, never shows other users' content. |
@@ -33,6 +33,8 @@ its place in the POC. Anything else goes in "Later".
 | D20 | Deployment | Docker Compose on one machine (the 4060 laptop for POC). Worker can later run on another machine pointing at the same DB/storage. No Kubernetes. |
 | D21 | Mic | Any input `getUserMedia` exposes. Reference POC mic: **ReSpeaker XVF3800** (USB, on-device beamforming/AEC/NS). |
 | D22 | Channels / DoA | Transcribe a single channel. Browser uploads what it gets (mono or stereo, untouched); server picks the channel at ffmpeg conversion (`left` / `right` / `mix`, admin default, per-recording override on re-transcribe). No DoA: not in the audio stream, not reachable from a browser, laggy, and pyannote diarizes by voice. |
+| D23 | Priority | Owner decision: safe login (M1) → record and push (M2) → transcription → insights. |
+| D24 | Group changes | IdP groups are read at login. Keycloak's LDAP cache policy must be `NO_CACHE` (or short), or removals don't apply. To cut someone off immediately, also disable them in the app (ends sessions at once). |
 
 ## Components
 

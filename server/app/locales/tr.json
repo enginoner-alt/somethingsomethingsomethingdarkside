@@ -8,7 +8,6 @@
   "login.username": "Kullanıcı adı",
   "login.password": "Parola",
   "login.submit": "Giriş yap",
-  "login.error": "Kullanıcı adı veya parola hatalı.",
   "home.title": "Kayıtlar",
   "home.welcome": "Hoş geldin, {name}.",
   "home.placeholder": "Kayıt özelliği bir sonraki aşamada (M1) gelecek.",
@@ -39,5 +38,18 @@
   "job.status.queued": "sırada",
   "job.status.running": "çalışıyor",
   "job.status.done": "tamamlandı",
-  "job.status.failed": "başarısız"
+  "job.status.failed": "başarısız",
+  "login.error.credentials": "Kullanıcı adı veya parola hatalı.",
+  "login.error.throttled": "Çok fazla başarısız deneme. Birkaç dakika sonra tekrar dene.",
+  "login.error.sso_failed": "Tek oturum açma başarısız oldu. Lütfen tekrar dene.",
+  "login.error.not_allowed": "Hesabının bu uygulamayı kullanma izni yok. Erişim için bir yöneticiye başvur.",
+  "login.error.conflict": "Bu kullanıcı adıyla bir hesap zaten var. Bir yöneticiye başvur.",
+  "login.error.disabled": "Hesabın devre dışı.",
+  "login.sso": "{label} ile giriş yap",
+  "login.or": "veya yerel hesapla",
+  "login.break_glass": "Acil durum yönetici girişi",
+  "admin.source": "Giriş",
+  "admin.source_local": "Yerel",
+  "admin.source_oidc": "SSO",
+  "login.error.sso_unavailable": "Giriş servisine şu an ulaşılamıyor. Daha sonra tekrar dene."
 }

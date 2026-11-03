@@ -48,7 +48,7 @@ def migrated_db():
 @pytest.fixture(autouse=True)
 def clean_tables():
     with get_engine().begin() as conn:
-        conn.execute(text("TRUNCATE jobs, users RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE jobs, login_failures, users RESTART IDENTITY CASCADE"))
     yield
 
 
@@ -90,3 +90,9 @@ def login(client: TestClient, username: str, password: str):
         data={"username": username, "password": password, "csrf": token},
         follow_redirects=False,
     )
+
+
+@pytest.fixture
+def cfg(monkeypatch):
+    """The live (cached) config; use monkeypatch.setattr(cfg, ...) to tweak it."""
+    return get_config()

@@ -32,6 +32,7 @@ def ensure_admin(db: Session, cfg: Config) -> None:
         user.password_hash = hash_password(cfg.bootstrap_admin_password)
         user.is_admin = True
         user.is_active = True
+        user.auth_version += 1
         log.warning("reset password for admin user %r", cfg.bootstrap_admin_username)
     db.commit()
 

@@ -1,0 +1,51 @@
+# Dummy directory for the auth test harness. Base DN: dc=darkside,dc=test
+# All passwords: "Passw0rd!"   (TEST DATA ONLY)
+
+dn: ou=people,dc=darkside,dc=test
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=darkside,dc=test
+objectClass: organizationalUnit
+ou: groups
+
+# Admin: member of darkside-users and darkside-admins
+dn: uid=jdoe,ou=people,dc=darkside,dc=test
+objectClass: inetOrgPerson
+uid: jdoe
+cn: Jane Doe
+givenName: Jane
+sn: Doe
+mail: jdoe@darkside.test
+userPassword: Passw0rd!
+
+# Regular user: member of darkside-users only
+dn: uid=asmith,ou=people,dc=darkside,dc=test
+objectClass: inetOrgPerson
+uid: asmith
+cn: Alan Smith
+givenName: Alan
+sn: Smith
+mail: asmith@darkside.test
+userPassword: Passw0rd!
+
+# Outsider: valid LDAP account, but not in darkside-users
+dn: uid=mallory,ou=people,dc=darkside,dc=test
+objectClass: inetOrgPerson
+uid: mallory
+cn: Mallory Outsider
+givenName: Mallory
+sn: Outsider
+mail: mallory@darkside.test
+userPassword: Passw0rd!
+
+dn: cn=darkside-users,ou=groups,dc=darkside,dc=test
+objectClass: groupOfNames
+cn: darkside-users
+member: uid=jdoe,ou=people,dc=darkside,dc=test
+member: uid=asmith,ou=people,dc=darkside,dc=test
+
+dn: cn=darkside-admins,ou=groups,dc=darkside,dc=test
+objectClass: groupOfNames
+cn: darkside-admins
+member: uid=jdoe,ou=people,dc=darkside,dc=test

@@ -12,8 +12,8 @@ from your own local LLM. Your server, your models, your data.
 - [docs/MILESTONES.md](docs/MILESTONES.md): milestones and acceptance criteria
 - [docs/WINDOWS-WSL.md](docs/WINDOWS-WSL.md): running the POC on Windows via WSL2 (production uses the Linux instructions below)
 
-**Status: M0 (skeleton) done.** You can log in, manage local users, and run test
-jobs through the queue. Recording is M1.
+**Status: M1 (safe login) done.** Local login is hardened, and optional SSO
+via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record and push.
 
 ## Requirements
 
@@ -73,6 +73,36 @@ jobs through the queue. Recording is M1.
 5. Switch the language to Türkçe. The UI is translated and the choice persists
    after logging out and back in.
 
+## M1: login safety
+
+On by default, no configuration needed:
+
+- **Brute-force throttling.** 5 failed logins per username from one IP, or 20
+  from one IP in total, within 15 minutes. After that, logins from there are
+  refused for the rest of the window, even with the right password. Another IP
+  is unaffected, so nobody can lock the real admin out from elsewhere.
+- **Idle timeout.** 2 hours without activity logs you out (12 hours absolute).
+- **Instant revocation.** **Disable** in the admin panel ends that user's
+  sessions immediately.
+
+### SSO (optional, off in the POC)
+
+Fill in the `OIDC_*` settings in `.env` (see `.env.example`) to add a
+**Sign in with …** button. Then:
+
+- AD/LDAP, MFA (TOTP, passkeys), password policies and lockouts are
+  configured in the identity provider, not here.
+- `OIDC_REQUIRED_GROUP` restricts who may log in. `OIDC_ADMIN_GROUP` grants
+  admin, re-checked at every login.
+- SSO users are matched by IdP identity, never by username. An IdP user
+  called `admin` can't take over the local admin.
+- `LOCAL_LOGIN_MODE=break_glass_only` hides the password form behind an
+  "Emergency administrator login" link and allows only the bootstrap admin.
+  That way you can still get in when the identity provider is down.
+
+How this was tested (OpenLDAP + Keycloak + TOTP, 12 scenarios) and what to
+change for AD: [dev/auth-test/README.md](dev/auth-test/README.md).
+
 ## Operations
 
 ```bash
@@ -125,4 +155,5 @@ deploy/Caddyfile         TLS + security headers (mic allowed, camera/geo off)
 server/app/              FastAPI app, job queue, worker, templates, locales
 server/alembic/          database migrations (applied on api start)
 server/tests/            pytest suite (Postgres)
+dev/auth-test/           SSO test harness: OpenLDAP + Keycloak + browser e2e (not deployed)
 ```

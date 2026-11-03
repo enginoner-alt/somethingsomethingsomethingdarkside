@@ -1,5 +1,6 @@
 """Shared helpers for HTML routes: current user, locale, CSRF, rendering."""
 
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -22,14 +23,34 @@ class LoginRequired(Exception):
     """Raised by `require_user`; turned into a redirect to /login."""
 
 
+def start_session(request: Request, user: User, method: str, **extra: object) -> None:
+    """Fresh session contents on login (no fixation of the pre-login session)."""
+    request.session.clear()
+    request.session.update(
+        {"user_id": user.id, "v": user.auth_version, "seen": int(time.time()), "via": method}
+    )
+    request.session.update(extra)
+    get_csrf_token(request.session)
+
+
 def current_user(request: Request, db: Annotated[Session, Depends(get_db)]) -> User | None:
-    user_id = request.session.get("user_id")
+    session = request.session
+    user_id = session.get("user_id")
     if user_id is None:
         return None
+    now = int(time.time())
+    idle = now - int(session.get("seen", 0))
     user = db.get(User, user_id)
-    if user is None or not user.is_active:
-        request.session.clear()
+    if (
+        user is None
+        or not user.is_active
+        # Revoked: user disabled/re-enabled, password reset, etc.
+        or session.get("v") != user.auth_version
+        or idle > get_config().session_idle_timeout_seconds
+    ):
+        session.clear()
         return None
+    session["seen"] = now
     return user
 
 
@@ -58,6 +79,12 @@ def resolve_locale(request: Request, user: User | None) -> str:
     return i18n.negotiate(request.headers.get("accept-language"), get_config().default_locale)
 
 
+def client_ip(request: Request) -> str:
+    # uvicorn runs with --proxy-headers and the api port is only reachable
+    # through Caddy, so this is the real client address.
+    return (request.client.host if request.client else None) or "unknown"
+
+
 def safe_next(target: str | None) -> str:
     """Only allow same-site relative redirects."""
     if target and target.startswith("/") and not target.startswith("//") and "\\" not in target:
@@ -78,6 +105,7 @@ def render(
         name,
         {
             "app_name": get_config().app_name,
+            "cfg": get_config(),
             "user": user,
             "locale": locale,
             "locales": i18n.available_locales(),

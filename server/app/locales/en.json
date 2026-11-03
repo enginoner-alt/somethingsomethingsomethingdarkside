@@ -8,7 +8,6 @@
   "login.username": "Username",
   "login.password": "Password",
   "login.submit": "Sign in",
-  "login.error": "Wrong username or password.",
   "home.title": "Recordings",
   "home.welcome": "Welcome, {name}.",
   "home.placeholder": "Recording arrives in the next milestone (M1).",
@@ -39,5 +38,18 @@
   "job.status.queued": "queued",
   "job.status.running": "running",
   "job.status.done": "done",
-  "job.status.failed": "failed"
+  "job.status.failed": "failed",
+  "login.error.credentials": "Wrong username or password.",
+  "login.error.throttled": "Too many failed attempts. Try again in a few minutes.",
+  "login.error.sso_failed": "Single sign-on failed. Please try again.",
+  "login.error.not_allowed": "Your account isn't allowed to use this app. Ask an administrator for access.",
+  "login.error.conflict": "An account with this username already exists here. Ask an administrator.",
+  "login.error.disabled": "Your account is disabled.",
+  "login.sso": "Sign in with {label}",
+  "login.or": "or with a local account",
+  "login.break_glass": "Emergency administrator login",
+  "admin.source": "Sign-in",
+  "admin.source_local": "Local",
+  "admin.source_oidc": "SSO",
+  "login.error.sso_unavailable": "The sign-in service is unreachable right now. Try again later."
 }

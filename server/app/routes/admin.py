@@ -86,6 +86,7 @@ def toggle_active(
     if user.id == admin.id:
         return RedirectResponse("/admin?error=self_disable", status_code=303)
     user.is_active = not user.is_active
+    user.auth_version += 1  # end their sessions now, not at idle timeout
     db.commit()
     return RedirectResponse("/admin", status_code=303)
 
