@@ -32,6 +32,7 @@ its place in the POC. Anything else goes in "Later".
 | D19 | Concurrency | 1 GPU job at a time (POC). Queue handles the rest. |
 | D20 | Deployment | Docker Compose on one machine (the 4060 laptop for POC). Worker can later run on another machine pointing at the same DB/storage. No Kubernetes. |
 | D21 | Mic | Any input `getUserMedia` exposes. Reference POC mic: **ReSpeaker XVF3800** (USB, on-device beamforming/AEC/NS). |
+| D22 | Channels / DoA | Transcribe a single channel. Browser uploads what it gets (mono or stereo, untouched); server picks the channel at ffmpeg conversion (`left` / `right` / `mix`, admin default, per-recording override on re-transcribe). No DoA: not in the audio stream, not reachable from a browser, laggy, and pyannote diarizes by voice. |
 
 ## Components
 
@@ -75,9 +76,11 @@ for cheap laptop mics.
 
 - Class-compliant USB audio → shows up in `enumerateDevices()` on Windows,
   Linux, Android, and iOS (USB-C / adapter). Device label needs mic permission first.
-- It can expose more than one channel (processed beam vs. others, depending on
-  firmware). Browsers may downmix. M1 includes verifying which channel we
-  actually get and adding a channel selector if it matters.
+- It can expose more than one processed channel depending on firmware (e.g. a
+  "conference" beam with heavy NS vs. an "ASR" beam with lighter processing).
+  Browsers may downmix. Per D22 the channel is chosen server-side; M1/M2 record
+  one meeting, transcribe each channel, and set the better one as default.
+- DoA is not used (D22).
 
 ### Data model (core tables)
 
