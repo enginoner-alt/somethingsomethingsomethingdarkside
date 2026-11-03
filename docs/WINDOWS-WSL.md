@@ -181,9 +181,19 @@ In Ubuntu:
 nvidia-smi
 ```
 
-That should list the RTX 4060. Then install the NVIDIA Container Toolkit
+That should list the RTX 4060. At this point WSL has already given the GPU to
+Linux programs. **Docker containers** are a separate layer, though:
+
+- **Docker Desktop (WSL2 backend):** GPU support for containers is built in.
+  Skip to the check below; no toolkit needed.
+- **Docker Engine inside WSL (step 4):** containers can't see the GPU until you
+  install the NVIDIA Container Toolkit. Without it, `--gpus all` fails with
+  `could not select device driver "" with capabilities: [[gpu]]`.
+
+Not sure which case you're in? Run the check below first. If it prints the
+4060, you're done. If it shows that error, install the toolkit
 (official guide: <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>,
-the "apt" section), and configure Docker:
+the "apt" section) and configure Docker:
 
 ```bash
 sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
