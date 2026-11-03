@@ -1,3 +1,7 @@
+**somethingsomethingsomethingINcomplete**
+
+![Something something something dark side](https://gifdb.com/images/high/something-dark-side-palpatine-animation-7jq8zzvws3y72ylr.webp)
+
 # somethingsomethingsomethingdarkside
 
 Self-hosted meeting recorder: record from any device and any mic in the
