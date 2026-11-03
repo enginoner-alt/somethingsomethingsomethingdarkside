@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ t("admin.title") }} · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ t("admin.title") }}</h1>
+{% if error %}<p class="error" role="alert">{{ t("admin.error." ~ error) }}</p>{% endif %}
+
+<section class="card">
+  <h2>{{ t("admin.users") }}</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>{{ t("admin.username") }}</th><th>{{ t("admin.role") }}</th>
+      <th>{{ t("admin.status") }}</th><th>{{ t("admin.last_login") }}</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr>
+        <td>{{ u.username }}</td>
+        <td>{{ t("admin.role_admin") if u.is_admin else t("admin.role_user") }}</td>
+        <td>{{ t("admin.active") if u.is_active else t("admin.disabled") }}</td>
+        <td>{{ u.last_login_at.strftime("%Y-%m-%d %H:%M") if u.last_login_at else "—" }}</td>
+        <td>
+          {% if u.id != user.id %}
+          <form method="post" action="/admin/users/{{ u.id }}/toggle-active" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf_token }}">
+            <button class="link">{{ t("admin.disable") if u.is_active else t("admin.enable") }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <h3>{{ t("admin.create_user") }}</h3>
+  <form method="post" action="/admin/users" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <input name="username" placeholder="{{ t('admin.username') }}" required>
+    <input name="password" type="password" autocomplete="new-password"
+           minlength="{{ min_password_length }}"
+           placeholder="{{ t('admin.password_hint', n=min_password_length) }}" required>
+    <label class="check"><input type="checkbox" name="is_admin"> {{ t("admin.role_admin") }}</label>
+    <button class="primary">{{ t("admin.create") }}</button>
+  </form>
+</section>
+
+<section class="card" id="jobs">
+  <h2>{{ t("admin.jobs") }}</h2>
+  <div class="row">
+    {% for q in queues %}
+    <form method="post" action="/admin/jobs/test" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="queue" value="{{ q }}">
+      <button>{{ t("admin.test_job", queue=q) }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>#</th><th>{{ t("admin.queue") }}</th><th>{{ t("admin.type") }}</th>
+      <th>{{ t("admin.status") }}</th><th>{{ t("admin.result") }}</th>
+    </tr></thead>
+    <tbody id="job-rows" data-status-labels='{{ {"queued": t("job.status.queued"), "running": t("job.status.running"), "done": t("job.status.done"), "failed": t("job.status.failed")} | tojson }}'>
+    {% for j in jobs %}
+      <tr><td>{{ j.id }}</td><td>{{ j.queue }}</td><td>{{ j.type }}</td>
+        <td><span class="badge {{ j.status }}">{{ t("job.status." ~ j.status) }}</span></td>
+        <td class="mono">{{ (j.result or "") if not j.error else j.error.splitlines()[-1] }}</td></tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">{{ t("admin.no_jobs") }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+<script src="/static/admin.js" defer></script>
+{% endblock %}

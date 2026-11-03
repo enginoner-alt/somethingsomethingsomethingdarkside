@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>{{ t("home.title") }}</h1>
+  <p>{{ t("home.welcome", name=user.display_name or user.username) }}</p>
+  <p class="muted">{{ t("home.placeholder") }}</p>
+</section>
+{% endblock %}

@@ -1,0 +1,20 @@
+# SITE_ADDRESS: your hostname, e.g. rec.example.com (covered by your wildcard cert).
+# CADDY_TLS:    "<cert> <key>" paths inside /certs (default: fullchain.pem privkey.pem),
+#               or "internal" for a self-signed cert when testing locally.
+{$SITE_ADDRESS} {
+	tls {$CADDY_TLS}
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		# Mic is the whole point; everything else is off.
+		Permissions-Policy "microphone=(self), camera=(), geolocation=()"
+		-Server
+	}
+
+	reverse_proxy api:8000
+}

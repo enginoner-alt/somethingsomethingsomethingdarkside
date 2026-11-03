@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ app_name }}</a>
+    <nav>
+      {% if user %}
+        {% if user.is_admin %}<a href="/admin">{{ t("nav.admin") }}</a>{% endif %}
+        <span class="muted">{{ user.display_name or user.username }}</span>
+        <form method="post" action="/logout" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="link">{{ t("nav.logout") }}</button>
+        </form>
+      {% endif %}
+      <form method="post" action="/lang" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ request.url.path }}">
+        <label class="sr-only" for="lang">{{ t("nav.language") }}</label>
+        <select id="lang" name="locale" onchange="this.form.submit()">
+          {% for code, name in locales.items() %}
+            <option value="{{ code }}" {% if code == locale %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button>{{ t("common.ok") }}</button></noscript>
+      </form>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

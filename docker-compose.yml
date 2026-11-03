@@ -1,0 +1,79 @@
+name: darkside
+
+x-server: &server
+  build: ./server
+  image: darkside-server:local
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://darkside:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/darkside
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: darkside
+      POSTGRES_DB: darkside
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darkside -d darkside"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    <<: *server
+    command: ["api"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Stub in M0 (runs test jobs only). Becomes the CUDA/WhisperX image in M2.
+  worker-gpu:
+    <<: *server
+    command: ["worker", "--queue", "gpu"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://darkside:${POSTGRES_PASSWORD}@postgres:5432/darkside
+      WORKER_ID: worker-gpu-1
+    depends_on:
+      api:
+        condition: service_healthy
+
+  worker-llm:
+    <<: *server
+    command: ["worker", "--queue", "llm"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://darkside:${POSTGRES_PASSWORD}@postgres:5432/darkside
+      WORKER_ID: worker-llm-1
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      CADDY_TLS: ${CADDY_TLS:-/certs/fullchain.pem /certs/privkey.pem}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/certs:/certs:ro
+      - caddy_data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
