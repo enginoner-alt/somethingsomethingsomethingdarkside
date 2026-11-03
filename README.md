@@ -10,6 +10,7 @@ from your own local LLM. Your server, your models, your data.
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design and decisions log
 - [docs/MILESTONES.md](docs/MILESTONES.md): milestones and acceptance criteria
+- [docs/WINDOWS-WSL.md](docs/WINDOWS-WSL.md): running the POC on Windows via WSL2 (production uses the Linux instructions below)
 
 **Status: M0 (skeleton) done.** You can log in, manage local users, and run test
 jobs through the queue. Recording is M1.
