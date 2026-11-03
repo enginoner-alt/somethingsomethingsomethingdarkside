@@ -32,7 +32,29 @@ needs no changes.
 `e2e-idp-down.cjs` runs with Keycloak **stopped**: the SSO button fails
 gracefully, and the break-glass admin can still log in.
 
-Last run in the Claude sandbox: all checks pass (Keycloak 26.0.7, OpenLDAP slapd 2.6, Chromium).
+Last runs in the Claude sandbox: all checks pass (Keycloak 26.0.7, OpenLDAP
+slapd 2.6, Chromium), both ways:
+
+- **plain HTTP** (app on `localhost:8000`, Keycloak on `localhost:8080`), and
+- **full HTTPS, like production**: app behind Caddy at `https://rec.darkside.test`
+  and Keycloak at `https://kc.darkside.test:8443`, both using a test wildcard
+  chain from `../make-test-certs.sh`. The app trusts the test CA via `deploy/ca/`,
+  with none of the insecure switches below. Three consecutive passes.
+
+### HTTPS variant
+
+1. `OUT_DIR=./test-certs ../make-test-certs.sh`, then copy `fullchain.pem` and
+   `privkey.pem` to `deploy/certs/` and `ca.pem` to `deploy/ca/`.
+2. Make `rec.darkside.test` and `kc.darkside.test` resolve to the machine, and
+   trust `ca.pem` in the browser that runs the test.
+3. Start Keycloak with `--https-port 8443 --https-certificate-file …/fullchain.pem
+   --https-certificate-key-file …/privkey.pem --hostname https://kc.darkside.test:8443`.
+4. Run `configure-keycloak.sh` with `KC_URL=https://kc.darkside.test:8443` and
+   `APP_URL=https://rec.darkside.test`.
+5. Start the stack with `SITE_ADDRESS=rec.darkside.test`, the default
+   `CADDY_TLS`, and `OIDC_ISSUER=https://kc.darkside.test:8443/realms/darkside`.
+   The api container must be able to resolve `kc.darkside.test`.
+6. `APP_URL=https://rec.darkside.test node e2e.cjs`
 
 ## Dummy accounts (seed.ldif)
 

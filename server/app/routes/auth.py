@@ -4,6 +4,7 @@ import logging
 from typing import Annotated
 from urllib.parse import urlencode
 
+import httpx
 from authlib.integrations.base_client.errors import OAuthError
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -165,6 +166,11 @@ async def oidc_callback(request: Request, db: Annotated[Session, Depends(get_db)
     except OAuthError as exc:
         log.warning("OIDC callback failed: %s", exc)
         return _login_page(request, next_, "sso_failed", 401)
+    except httpx.HTTPError as exc:
+        # IdP slow or unreachable while exchanging the code: a clear message,
+        # not a 500. The user can retry or use the break-glass login.
+        log.warning("OIDC callback could not reach the IdP: %r", exc)
+        return _login_page(request, next_, "sso_unavailable", 503)
 
     result = oidc.upsert_user(db, claims, cfg)
     if result.user is None:

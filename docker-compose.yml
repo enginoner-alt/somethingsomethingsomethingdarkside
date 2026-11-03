@@ -7,6 +7,10 @@ x-server: &server
   env_file: .env
   environment:
     DATABASE_URL: postgresql+psycopg://darkside:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/darkside
+  volumes:
+    # Optional internal/self-signed CA certificates the app should trust
+    # (e.g. for your Keycloak). See deploy/ca/README.md.
+    - ./deploy/ca:/etc/darkside/ca:ro
 
 services:
   postgres:

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.config import Config, get_config
 from app.db import utcnow
 from app.models import AuthSource, User
+from app.tls import ssl_context
 
 
 @lru_cache
@@ -26,7 +27,14 @@ def get_oauth() -> OAuth:
         server_metadata_url=cfg.oidc_issuer.rstrip("/") + "/.well-known/openid-configuration",
         client_id=cfg.oidc_client_id,
         client_secret=cfg.oidc_client_secret,
-        client_kwargs={"scope": cfg.oidc_scopes, "code_challenge_method": "S256"},
+        client_kwargs={
+            "scope": cfg.oidc_scopes,
+            "code_challenge_method": "S256",
+            # Public CAs + anything in deploy/ca/ (internal CA for the IdP).
+            "verify": ssl_context(),
+            # httpx's default is 5 s; a busy or cold IdP can take longer.
+            "timeout": 15.0,
+        },
     )
     return oauth
 

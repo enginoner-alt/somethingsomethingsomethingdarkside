@@ -44,19 +44,32 @@ async function freshCode(user, secret) {
 // --- helpers --------------------------------------------------------------------
 const secrets = {};
 let failures = 0;
-const check = (ok, label) => {
+let current = null; // page under test, for failure diagnostics
+const check = async (ok, label) => {
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}`);
-  if (!ok) failures++;
+  if (!ok) {
+    failures++;
+    if (current) {
+      const shot = `${SHOTS}/FAIL-${failures}.png`;
+      await current.screenshot({ path: shot }).catch(() => {});
+      console.log(`      at ${current.url()} (screenshot ${shot})`);
+    }
+  }
 };
+
+// Click something that submits a form and wait until the browser has actually
+// navigated (checking page.url() right after click() is a race).
+const submit = (page, selector) => Promise.all([page.waitForNavigation(), page.click(selector)]);
 
 async function ssoLogin(browser, user, shotPrefix) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto(`${APP}/login`);
-  await page.click("text=Sign in with Keycloak");
+  current = page;
+  await submit(page, "text=Sign in with Keycloak");
   await page.fill("#username", user);
   await page.fill("#password", PASSWORD);
-  await page.click("#kc-login");
+  await submit(page, "#kc-login");
 
   if (await page.locator("#mode-manual").count()) {
     // First login: Keycloak forces TOTP enrolment.
@@ -64,12 +77,11 @@ async function ssoLogin(browser, user, shotPrefix) {
     await page.click("#mode-manual");
     secrets[user] = (await page.locator("#kc-totp-secret-key").innerText()).trim();
     await page.fill("#totp", await freshCode(user, secrets[user]));
-    await page.click("#saveTOTPBtn");
+    await submit(page, "#saveTOTPBtn");
   } else if (await page.locator("#otp").count()) {
     await page.fill("#otp", await freshCode(user, secrets[user]));
-    await page.click("#kc-login");
+    await submit(page, "#kc-login");
   }
-  await page.waitForLoadState("load");
   return { ctx, page };
 }
 
@@ -78,35 +90,35 @@ async function ssoLogin(browser, user, shotPrefix) {
 
   // 1. Admin-group user: first login enrols TOTP, lands in the app as admin.
   let { ctx, page } = await ssoLogin(browser, "jdoe", "jdoe");
-  check(page.url() === `${APP}/`, "jdoe: SSO + TOTP enrolment lands on the app");
+  await check(page.url() === `${APP}/`, "jdoe: SSO + TOTP enrolment lands on the app");
   const html = await page.content();
-  check(html.includes("Jane Doe") && !html.includes("Jane Doe Doe"), "jdoe: display name comes from LDAP (given name + surname)");
-  check((await page.goto(`${APP}/admin`)).status() === 200, "jdoe: darkside-admins → admin panel allowed");
+  await check(html.includes("Jane Doe") && !html.includes("Jane Doe Doe"), "jdoe: display name comes from LDAP (given name + surname)");
+  await check((await page.goto(`${APP}/admin`)).status() === 200, "jdoe: darkside-admins → admin panel allowed");
   await page.screenshot({ path: `${SHOTS}/jdoe-admin.png`, fullPage: true });
 
   // 2. Logout ends the Keycloak session too.
   await page.goto(`${APP}/`);
-  await page.click("button:has-text('Log out')");
-  if (await page.locator("#kc-logout").count()) await page.click("#kc-logout");
+  await submit(page, "button:has-text('Log out')");
+  if (await page.locator("#kc-logout").count()) await submit(page, "#kc-logout");
   await page.waitForURL(`${APP}/login`);
-  await page.click("text=Sign in with Keycloak");
-  check((await page.locator("#username").count()) === 1, "logout: IdP session ended (password asked again)");
+  await submit(page, "text=Sign in with Keycloak");
+  await check((await page.locator("#username").count()) === 1, "logout: IdP session ended (password asked again)");
   await ctx.close();
 
   // 3. Second login asks for the TOTP code (MFA really enforced).
   ({ ctx, page } = await ssoLogin(browser, "jdoe"));
-  check(page.url() === `${APP}/`, "jdoe: second login with password + TOTP code");
+  await check(page.url() === `${APP}/`, "jdoe: second login with password + TOTP code");
   await ctx.close();
 
   // 4. Regular user: logged in, but no admin.
   ({ ctx, page } = await ssoLogin(browser, "asmith", "asmith"));
-  check(page.url() === `${APP}/`, "asmith: SSO login works");
-  check((await page.goto(`${APP}/admin`)).status() === 403, "asmith: not in darkside-admins → 403 on /admin");
+  await check(page.url() === `${APP}/`, "asmith: SSO login works");
+  await check((await page.goto(`${APP}/admin`)).status() === 403, "asmith: not in darkside-admins → 403 on /admin");
   await ctx.close();
 
   // 5. Valid LDAP account outside the required group is refused by the app.
   ({ ctx, page } = await ssoLogin(browser, "mallory", "mallory"));
-  check((await page.content()).includes("isn't allowed to use this app"), "mallory: not in darkside-users → refused");
+  await check((await page.content()).includes("isn't allowed to use this app"), "mallory: not in darkside-users → refused");
   await page.screenshot({ path: `${SHOTS}/mallory-refused.png` });
   await ctx.close();
 
@@ -115,35 +127,35 @@ async function ssoLogin(browser, user, shotPrefix) {
     input: "dn: cn=darkside-users,ou=groups,dc=darkside,dc=test\nchangetype: modify\ndelete: member\nmember: uid=asmith,ou=people,dc=darkside,dc=test\n",
   });
   ({ ctx, page } = await ssoLogin(browser, "asmith"));
-  check((await page.content()).includes("isn't allowed to use this app"), "asmith: removed from group in LDAP → refused");
+  await check((await page.content()).includes("isn't allowed to use this app"), "asmith: removed from group in LDAP → refused");
   await ctx.close();
 
   // 7. Deleting a user from LDAP: Keycloak rejects the password outright.
   execFileSync("ldapdelete", [...LDAP, "uid=mallory,ou=people,dc=darkside,dc=test"]);
   ctx = await browser.newContext();
-  page = await ctx.newPage();
+  page = current = await ctx.newPage();
   await page.goto(`${APP}/login`);
-  await page.click("text=Sign in with Keycloak");
+  await submit(page, "text=Sign in with Keycloak");
   await page.fill("#username", "mallory");
   await page.fill("#password", PASSWORD);
-  await page.click("#kc-login");
-  check((await page.locator("#input-error, .kc-feedback-text, [id*=error]").count()) > 0 && !page.url().startsWith(APP),
+  await submit(page, "#kc-login");
+  await check((await page.locator("#input-error, .kc-feedback-text, [id*=error]").count()) > 0 && !page.url().startsWith(APP),
     "mallory: deleted from LDAP → Keycloak refuses login");
   await ctx.close();
 
   // 8. A local account can't sneak in with an SSO-only username, and the
   //    break-glass admin works through the local form.
   ctx = await browser.newContext();
-  page = await ctx.newPage();
+  page = current = await ctx.newPage();
   await page.goto(`${APP}/login`);
   await page.fill("input[name=username]", "jdoe");
   await page.fill("input[name=password]", PASSWORD);
-  await page.click("form[action='/login'] button");
-  check((await page.content()).includes("Wrong username or password"), "jdoe: SSO user has no local password");
+  await submit(page, "form[action='/login'] button");
+  await check((await page.content()).includes("Wrong username or password"), "jdoe: SSO user has no local password");
   await page.fill("input[name=username]", "admin");
   await page.fill("input[name=password]", "admin-password-123");
-  await page.click("form[action='/login'] button");
-  check(page.url() === `${APP}/`, "admin: break-glass local login works");
+  await submit(page, "form[action='/login'] button");
+  await check(page.url() === `${APP}/`, "admin: break-glass local login works");
   await page.goto(`${APP}/admin`);
   await page.screenshot({ path: `${SHOTS}/admin-users.png`, fullPage: true });
   await ctx.close();

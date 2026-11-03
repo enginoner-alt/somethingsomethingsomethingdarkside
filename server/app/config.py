@@ -62,6 +62,10 @@ class Config(BaseSettings):
     # e.g. https://rec.example.com/auth/oidc/callback
     oidc_redirect_uri: str | None = None
 
+    # Extra CA certificates (internal/self-signed CAs) for outgoing HTTPS.
+    # docker-compose mounts deploy/ca/ here; see app/tls.py.
+    extra_ca_dir: str = "/etc/darkside/ca"
+
     @property
     def oidc_enabled(self) -> bool:
         return bool(self.oidc_issuer and self.oidc_client_id)

@@ -46,12 +46,8 @@ via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record an
    deploy/certs/privkey.pem
    ```
 
-   If your files have other names, change `CADDY_TLS` in `.env` (paths are
-   inside `/certs`). This folder is git-ignored.
-
-   *No certificate handy?* Set `SITE_ADDRESS=localhost` and `CADDY_TLS=internal`
-   for a self-signed one. Your browser will warn about it, which is fine for a
-   local test.
+   See [Certificates](#certificates) below. With a normal (public) wildcard
+   certificate, that's all.
 
 3. Start:
 
@@ -60,6 +56,41 @@ via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record an
    ```
 
 4. Open `https://<SITE_ADDRESS>` and log in as `admin` with the password you set.
+
+## Certificates
+
+| Your certificate | What to do | Devices |
+|---|---|---|
+| **Public wildcard** (Let's Encrypt, DigiCert, Sectigo, …) **(recommended)** | Put `fullchain.pem` + `privkey.pem` in `deploy/certs/`. Done. | Every browser and phone trusts it automatically. |
+| **Internal / self-signed CA** | Same two files in `deploy/certs/`, **plus** the CA certificate in `deploy/ca/` (e.g. `deploy/ca/company-ca.pem`). | Every device must trust that CA too (see below). |
+| **None, just trying it out** | `SITE_ADDRESS=localhost` and `CADDY_TLS=internal` in `.env`. | Browser warning on the laptop. Phones won't work. |
+
+Details:
+
+- **`fullchain.pem` must contain the full chain:** your certificate first,
+  then the intermediate certificate(s). Your provider usually ships it as
+  "fullchain" or "bundle". If you only have `cert.pem` and `chain.pem`:
+  `cat cert.pem chain.pem > fullchain.pem`. Without the intermediate, desktop
+  browsers often still work but phones don't.
+- **A wildcard covers one level:** `*.example.com` covers `rec.example.com`,
+  but not `example.com` or `a.rec.example.com`.
+- **Files named differently?** Set `CADDY_TLS` in `.env` (paths inside `/certs`).
+- **`deploy/ca/`** is for servers *the app itself calls*, such as your
+  Keycloak, when they use an internal CA. Drop the CA's `.pem`/`.crt` there and
+  restart. The api log then shows `trusting extra CA certificate …`. Public
+  CAs need nothing there.
+- **Self-signed on phones is the hassle part.** On iOS you install the CA
+  profile, then enable it under *Settings → General → About → Certificate
+  Trust Settings*. On Android it's *Settings → Security → Encryption &
+  credentials → Install a certificate → CA certificate*. With a public
+  wildcard you skip all of this.
+
+**Tested** (sandbox, all over HTTPS, no insecure switches): a test chain
+(root → intermediate → `*.darkside.test`, made by `dev/make-test-certs.sh`)
+served by Caddy from `deploy/certs/`; Keycloak on HTTPS with the same
+wildcard; the app trusting the CA from `deploy/ca/`; the full SSO test 3× in a
+row; and without the CA file, SSO refuses the certificate and shows a clear
+message instead of crashing.
 
 ## M0 acceptance test
 

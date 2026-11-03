@@ -116,6 +116,9 @@ there (Windows drives are under `/mnt/c`):
 cp /mnt/c/Users/<you>/path/to/fullchain.pem /mnt/c/Users/<you>/path/to/privkey.pem deploy/certs/
 ```
 
+See **Certificates** in the README for the full-chain requirement and what
+changes if your certificate comes from an internal CA.
+
 ## 7. Make the hostname resolve
 
 `SITE_ADDRESS` (e.g. `rec.example.com`) must resolve to the laptop.

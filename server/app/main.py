@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -9,11 +10,15 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import get_config
 from app.models import User
 from app.routes import admin, auth
+from app.tls import ssl_context
 from app.web import LoginRequired, render, require_user
 
 
 def create_app() -> FastAPI:
     cfg = get_config()
+    # uvicorn only configures its own loggers; show the app's INFO lines too
+    # (failed logins, "trusting extra CA certificate ...", etc.).
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
     app = FastAPI(title=cfg.app_name, docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
         SessionMiddleware,
@@ -26,6 +31,9 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
     app.include_router(auth.router)
     app.include_router(admin.router)
+
+    if cfg.oidc_enabled:
+        ssl_context()  # load trusted CAs now, so the startup log lists them
 
     @app.exception_handler(LoginRequired)
     async def _login_redirect(request: Request, _exc: LoginRequired):

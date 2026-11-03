@@ -1,3 +1,5 @@
+import httpx
+
 from app import oidc
 from app.models import AuthSource, User
 from app.security import hash_password
@@ -93,3 +95,32 @@ def test_login_page_shows_sso_when_configured(client, cfg, monkeypatch):
     monkeypatch.setattr(cfg, "local_login_mode", "break_glass_only")
     page = client.get("/login").text
     assert "Emergency administrator login" in page
+
+
+class _SlowIdp:
+    async def authorize_access_token(self, request):
+        raise httpx.ReadTimeout("IdP took too long")
+
+
+class _FakeOAuth:
+    idp = _SlowIdp()
+
+
+def test_callback_idp_timeout_shows_message_not_500(client, cfg, monkeypatch):
+    monkeypatch.setattr(cfg, "oidc_issuer", ISS)
+    monkeypatch.setattr(cfg, "oidc_client_id", "darkside")
+    monkeypatch.setattr(oidc, "get_oauth", lambda: _FakeOAuth())
+    res = client.get("/auth/oidc/callback?code=x&state=y")
+    assert res.status_code == 503
+    assert "sign-in service is unreachable" in res.text
+
+
+def test_oidc_client_uses_extra_cas_and_longer_timeout(cfg, monkeypatch):
+    monkeypatch.setattr(cfg, "oidc_issuer", ISS)
+    monkeypatch.setattr(cfg, "oidc_client_id", "darkside")
+    oidc.get_oauth.cache_clear()
+    try:
+        kwargs = oidc.get_oauth().idp.client_kwargs
+        assert kwargs["timeout"] >= 15 and kwargs["verify"] is not None
+    finally:
+        oidc.get_oauth.cache_clear()
