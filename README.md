@@ -145,10 +145,25 @@ On a recording's page:
 - buttons for **Summary**, **Meeting subject** (also renames the recording),
   **Who is speaking?** (name suggestions, with "use these names"), **Action
   items** and **Decisions**;
-- a free **question** box.
+- an **Ask** box (see below).
 
 Answers come in the transcript's language and are saved, with re-run and
 delete. Long transcripts are done in parts.
+
+### Ask: questions with follow-ups, over one or more meetings
+
+**Ask** in the menu, the Ask box on a recording, or ticking meetings on the
+recordings list and pressing **Ask about N selected**. A chat keeps the
+conversation: each follow-up is sent with the meetings and the earlier
+turns, and answers come in the language of the question. Chats are private
+to their owner like the recordings themselves.
+
+**Admin → Services → LLM → Max context per Ask chat** caps one request
+(meetings + earlier turns + question, in characters; roughly 3–4 per token).
+While picking meetings a bar shows how much of it they use, and meetings
+that don't fit can't be started together. When a conversation grows, the
+oldest turns are left out first; the meetings always stay. The chat's
+instructions are editable under **Admin → Prompts → Ask (chat)**.
 
 **Trying it without a GPU or LLM:** `./darkside fakes up -d` starts a fake
 WhisperX and a fake LLM. Set the URLs `http://whisperx:9000` and

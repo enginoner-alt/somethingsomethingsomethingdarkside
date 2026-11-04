@@ -67,19 +67,63 @@ const check = (ok, label, detail = "") => {
   const who = await page.$$eval(".seg strong", (s) => [...new Set(s.map((x) => x.textContent))]);
   check(who.includes("Ayşe") && who.includes("Mehmet"), `names applied in the transcript (${who.join(", ")})`);
 
-  // Free question.
-  await page.fill("#ask-form input[name=question]", "Ne zaman imzalanacak?");
-  await page.click("#ask-form button");
-  await page.waitForSelector(".insight[data-kind=question][data-status=done]", { timeout: 30000 });
-  const qa = await page.textContent(".insight[data-kind=question]");
-  check(/FAKE ANSWER to: Ne zaman imzalanacak\?/.test(qa), "free question answered and saved", qa.slice(0, 120));
-
-  // Everything persisted: reload and it's all still there.
+  // Everything persisted: reload and the insights are all still there.
   await page.reload();
-  await page.waitForSelector(".insight[data-kind=question]");
+  await page.waitForSelector(".insight[data-kind=summary]");
   const kinds = await page.$$eval("#insights .insight", (r) => r.map((x) => x.dataset.kind));
-  check(["summary", "subject", "action_items", "decisions", "speakers", "question"].every((k) => kinds.includes(k)),
+  check(["summary", "subject", "action_items", "decisions", "speakers"].every((k) => kinds.includes(k)),
     `after reload all ${kinds.length} insights are still there (saved in the database)`);
+  const recUrl = page.url();
+
+  // Ask: a question opens a chat about this meeting; a follow-up remembers it.
+  await page.fill("#ask-form input[name=question]", "Ne zaman imzalanacak?");
+  await Promise.all([page.waitForURL(/\/ask\/\d+$/), page.click("#ask-form button")]);
+  await page.waitForSelector(".msg.assistant[data-status=done]", { timeout: 30000 });
+  let answers = await page.$$eval(".msg.assistant", (m) => m.map((x) => x.textContent));
+  check(/FAKE CHAT ANSWER to: Ne zaman imzalanacak\? \(meetings: 1, earlier turns: 0\)/.test(answers[0]),
+    "Ask: question about this meeting answered", answers[0]);
+  await page.fill("#followup-q", "Kim arayacak?");
+  await page.press("#followup-q", "Enter");
+  await page.waitForFunction(() => document.querySelectorAll(".msg.assistant[data-status=done]").length === 2, null, { timeout: 30000 });
+  answers = await page.$$eval(".msg.assistant", (m) => m.map((x) => x.textContent));
+  check(/Kim arayacak\? \(meetings: 1, earlier turns: 2\)/.test(answers[1]), "Ask: follow-up sent with the earlier turns", answers[1]);
+  await page.reload();
+  await page.waitForSelector(".msg.assistant[data-status=done]");
+  check((await page.$$(".msg")).length === 4, "Ask: the conversation is saved");
+
+  // Ask across meetings: pick two on the recordings list.
+  await page.goto(`${APP}/`);
+  await page.click(".upload-box summary");
+  await page.check("#consent");
+  await page.setInputFiles("#upload-file", AUDIO);
+  await page.click("#upload-form button");
+  await page.waitForFunction(() => /Uploaded|Yüklendi/.test(document.getElementById("upload-status").textContent), null, { timeout: 30000 });
+  // Wait until the new upload (the newest recording) has its transcript.
+  for (let i = 0; i < 60; i += 1) {
+    const ready = await page.evaluate(async () => {
+      const [newest] = await (await fetch("/api/recordings?limit=1")).json();
+      return (await (await fetch("/api/chats/sources")).json()).meetings.some((m) => m.id === newest.id);
+    });
+    if (ready) break;
+    await page.waitForTimeout(1000);
+  }
+  await page.reload();
+  await page.waitForSelector(".rec-row input.pick");
+  // Locators, not element handles: the list may redraw between the two clicks.
+  const boxes = page.locator(".rec-row input.pick");
+  await boxes.nth(0).check(); await boxes.nth(1).check();
+  await page.waitForFunction(() => (document.getElementById("ask-selected").getAttribute("href") || "").includes(","));
+  await Promise.all([page.waitForURL(/\/ask\?with=/), page.click("#ask-selected")]);
+  await page.waitForSelector("#source-list .source");
+  const budget = await page.textContent("#budget-text");
+  check(/^2 /.test(budget), "Ask: the two picked meetings are preselected, with the context meter", budget);
+  await page.fill("#new-q", "Ortak noktalar neler?");
+  await Promise.all([page.waitForURL(/\/ask\/\d+$/), page.click("#new-chat-btn")]);
+  await page.waitForSelector(".msg.assistant[data-status=done]", { timeout: 30000 });
+  const multi = await page.textContent(".msg.assistant");
+  check(/meetings: 2/.test(multi), "Ask: one chat over two meetings", multi);
+  await page.goto(recUrl);
+  await page.waitForSelector(".seg");
 
   // Transcribe again: channel 2 only, English.
   await page.click("details summary");

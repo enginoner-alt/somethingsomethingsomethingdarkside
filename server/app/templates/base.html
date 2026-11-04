@@ -38,6 +38,7 @@
     <nav class="navlist">
       <a href="/" {% if path == "/" or path.startswith("/recordings") %}class="active" aria-current="page"{% endif %}>{{ t("nav.recordings") }}</a>
       <a href="/record" {% if path == "/record" %}class="active" aria-current="page"{% endif %}><span class="dot" aria-hidden="true"></span>{{ t("rec.new") }}</a>
+      <a href="/ask" {% if path.startswith("/ask") %}class="active" aria-current="page"{% endif %}>{{ t("nav.ask") }}</a>
       {% if user.is_admin %}
         <a href="/admin" {% if path.startswith("/admin") %}class="open"{% endif %}>{{ t("nav.admin") }}</a>
         {% if path.startswith("/admin") %}

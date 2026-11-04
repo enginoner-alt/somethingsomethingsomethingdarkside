@@ -7,6 +7,13 @@
   const list = $("rec-list"), search = $("rec-search"), pager = $("rec-pager");
   const PAGE = 25;
   let rows = [], total = 0, offset = 0, timer = null;
+  const picked = new Set();  // meetings chosen for Ask
+  const askBtn = $("ask-selected");
+  const updateAsk = () => {
+    askBtn.hidden = !picked.size;
+    askBtn.textContent = t("rec.ask_selected", { n: picked.size });
+    askBtn.href = `/ask?with=${[...picked].join(",")}`;
+  };
 
   const STATE_BADGE = { uploaded: "done", recording: "running", interrupted: "queued", failed: "failed" };
 
@@ -23,7 +30,9 @@
       r.status !== "uploaded" ? el("span", { class: `badge ${STATE_BADGE[r.status] || "plain"}` }, t(`rec.state_${r.status}`)) : null,
       r.audio_url ? el("a", { class: "button quiet", href: r.audio_url, download: true }, t("rec.download")) : null,
       r.status !== "recording" ? el("button", { class: "quiet", onclick: () => remove(r.id) }, t("rec.delete")) : null);
-    return el("div", { class: "rec-row", "data-id": r.id }, titleEl, side, meta);
+    const box = r.audio_url ? el("input", { type: "checkbox", class: "pick", "aria-label": t("rec.pick_for_ask"), checked: picked.has(r.id) }) : el("span");
+    box.addEventListener?.("change", () => { box.checked ? picked.add(r.id) : picked.delete(r.id); updateAsk(); });
+    return el("div", { class: "rec-row with-pick", "data-id": r.id }, box, titleEl, side, meta);
   };
 
   const draw = () => {

@@ -372,6 +372,48 @@ body.has-nav main { margin-left: var(--side); }
   .work .segments { max-height: none; overflow: visible; }
 }
 
+
+/* --- Ask ------------------------------------------------------------------------- */
+.ask-layout { grid-template-columns: 260px minmax(0, 1fr); }
+.chat-list { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+.chat-list a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--radius); text-decoration: none; color: var(--ink-2); }
+.chat-list a:hover { background: var(--tint); }
+.chat-list a.active { background: var(--tint); color: var(--ink); box-shadow: inset 2px 0 0 var(--red); }
+.chat-title { font-weight: 500; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-main { display: flex; flex-direction: column; gap: 12px; }
+.thread-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.messages { display: flex; flex-direction: column; gap: 18px; padding: 4px 4px 12px; }
+.msg.user { align-self: flex-end; max-width: 80%; }
+.msg.user .bubble { background: var(--tint); padding: 10px 14px; border-radius: 14px 14px 4px 14px; white-space: pre-wrap; }
+.msg.assistant { max-width: 92%; }
+.msg .foot { margin-top: 4px; }
+.composer { display: flex; gap: 10px; align-items: flex-end; }
+.composer textarea { min-height: 48px; resize: vertical; font-size: 0.92rem; }
+.picker { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.source-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.source { flex-direction: row; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--line); font-weight: 400; cursor: pointer; }
+.source .grow { display: flex; flex-direction: column; min-width: 0; }
+.source-title { font-family: var(--serif); font-size: 1rem; color: var(--ink); }
+.share { font-variant-numeric: tabular-nums; }
+.budget { display: flex; flex-direction: column; gap: 6px; }
+.budget-bar { height: 6px; background: var(--tint); border-radius: 999px; overflow: hidden; }
+.budget-bar > div { height: 100%; width: 0; background: var(--gold); transition: width 120ms; }
+.budget.over .budget-bar > div { background: var(--red); }
+.budget.over #budget-text { color: var(--danger); }
+.rec-row.with-pick { grid-template-columns: auto minmax(0, 1fr) auto; }
+.rec-row.with-pick > .pick, .rec-row.with-pick > span:first-child { grid-row: 1 / span 2; align-self: center; }
+.rec-row.with-pick .meta { grid-column: 2; }
+.rec-row.with-pick .side { grid-column: 3; }
+@media (min-width: 861px) {
+  .work .chat-main { overflow: hidden; }
+  .work .chat-main .messages, .work .chat-main .source-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .work .picker { flex: 1; }
+}
+@media (max-width: 860px) {
+  .ask-layout.has-chat .chat-list-col { display: none; }
+  .ask-layout.no-chat .chat-list-col { order: 2; }
+}
+
 /* --- phones -------------------------------------------------------------------------- */
 @media (max-width: 860px) {
   body.has-nav main { margin-left: 0; }

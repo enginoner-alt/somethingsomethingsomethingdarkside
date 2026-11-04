@@ -20,6 +20,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app import (
+    chats,  # noqa: F401  (registers the chat job handler)
     jobs,
     pipeline,  # noqa: F401  (registers the M3 job handlers)
 )

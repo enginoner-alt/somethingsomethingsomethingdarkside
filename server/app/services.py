@@ -134,13 +134,16 @@ def _llm_headers() -> dict:
 
 
 def chat(s: ServicesSettings, system: str, user: str) -> str:
+    return chat_messages(
+        s, [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    )
+
+
+def chat_messages(s: ServicesSettings, messages: list[dict]) -> str:
+    """One OpenAI chat completion; `messages` as the API takes them."""
     if not (s.llm_base_url and s.llm_model):
         raise ServiceError("llm_not_set")
-    body = {
-        "model": s.llm_model,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        "temperature": s.llm_temperature,
-    }
+    body = {"model": s.llm_model, "messages": messages, "temperature": s.llm_temperature}
     try:
         r = httpx.post(
             s.llm_base_url.rstrip("/") + "/chat/completions",

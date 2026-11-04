@@ -120,10 +120,14 @@
     loadInsights();
   };
   document.querySelectorAll("#insight-buttons button").forEach((b) => b.addEventListener("click", () => ask(b.dataset.kind)));
-  $("ask-form").addEventListener("submit", (ev) => {
+  // Ask: starts a chat about this meeting (follow-ups continue on the Ask page).
+  $("ask-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const q = ev.target.question.value.trim();
-    if (q) { ask("question", q); ev.target.reset(); }
+    if (!q) return;
+    const res = await api("POST", "/api/chats", { recording_ids: [ID], question: q });
+    if (!res.ok) { $("insight-msg").hidden = false; $("insight-msg").textContent = errText(res); return; }
+    location.href = res.data.page_url;
   });
 
   if (player) player.addEventListener("timeupdate", () => {

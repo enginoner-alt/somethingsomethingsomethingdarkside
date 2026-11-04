@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from app import services
 from app.models import Insight, Job, Recording, Speaker, Transcript
-from app.settings_store import ServicesSettings, save_services
+from app.settings_store import ServicesSettings, get_services, save_services
 from app.worker import run_once
 from tests.conftest import csrf_from, login
 
@@ -427,3 +427,95 @@ def test_banned_languages_admin_checks(client, admin, db, configured):
     db.expire_all()
     s = get_services(db)
     assert (s.asr_banned_languages, s.asr_fallback_language) == (["az", "kk"], "tr")
+
+
+# --- Ask: chats with follow-ups over one or more meetings -----------------------------
+
+
+def transcribed(alice, db, n=1):
+    ids = [upload(alice)["id"] for _ in range(n)]
+    drain(db, "gpu")
+    return ids
+
+
+def test_chat_with_follow_up_over_two_meetings(alice, db, configured):
+    a, b = transcribed(alice, db, 2)
+    src = alice.get("/api/chats/sources").json()
+    assert {m["id"] for m in src["meetings"]} == {a, b} and all(
+        m["chars"] > 0 for m in src["meetings"]
+    )
+    r = alice.post("/api/chats", json={"recording_ids": [a, b], "question": "Ne zaman?"})
+    assert r.status_code == 201, r.text
+    chat = r.json()
+    assert [m["role"] for m in chat["messages"]] == ["user", "assistant"]
+    # A second question while the first is still waiting is refused.
+    busy = alice.post(f"/api/chats/{chat['id']}/messages", json={"question": "Ve?"})
+    assert busy.status_code == 409 and busy.json()["error"] == "chat_busy"
+    drain(db, "llm")
+    first = alice.get(f"/api/chats/{chat['id']}").json()["messages"][-1]
+    assert first["status"] == "done"
+    assert first["content"] == "FAKE CHAT ANSWER to: Ne zaman? (meetings: 2, earlier turns: 0)"
+    alice.post(f"/api/chats/{chat['id']}/messages", json={"question": "Kim arayacak?"})
+    drain(db, "llm")
+    msgs = alice.get(f"/api/chats/{chat['id']}").json()["messages"]
+    assert len(msgs) == 4 and "earlier turns: 2" in msgs[-1]["content"]
+    assert [c["id"] for c in alice.get("/api/chats").json()] == [chat["id"]]
+
+
+def test_chat_respects_the_context_limit(alice, db, configured):
+    (a,) = transcribed(alice, db)
+    size = alice.get("/api/chats/sources").json()["meetings"][0]["chars"]
+    s = get_services(db)
+    s.chat_max_chars = size + 5
+    save_services(db, s)
+    too_big = alice.post(
+        "/api/chats", json={"recording_ids": [a], "question": "a question too long"}
+    )
+    assert too_big.status_code == 413 and too_big.json()["error"] == "chat_too_large"
+    assert too_big.json()["limit"] == size + 5
+    assert (
+        alice.post("/api/chats", json={"recording_ids": [a], "question": "ok"}).status_code == 201
+    )
+
+
+def test_chat_drops_oldest_turns_first(alice, db, configured):
+    from app import chats
+    from app.models import Chat, ChatMessage
+
+    (a,) = transcribed(alice, db)
+    chat_id = alice.post("/api/chats", json={"recording_ids": [a], "question": "q1"}).json()["id"]
+    drain(db, "llm")
+    for q in ("q2", "q3"):
+        alice.post(f"/api/chats/{chat_id}/messages", json={"question": q})
+        drain(db, "llm")
+    chat = db.get(Chat, chat_id)
+    last = db.query(ChatMessage).filter_by(chat_id=chat_id).order_by(ChatMessage.id.desc()).first()
+    s = get_services(db)
+    full = chats.build_messages(db, chat, last, s)
+    assert [m["role"] for m in full] == ["system", "user", "assistant", "user", "assistant", "user"]
+    # Room for the meetings, the question and one earlier answer: the earlier
+    # *pair* is dropped whole, so history never starts with an answer.
+    s.chat_max_chars = len(full[0]["content"]) + len("q3") + len(full[-2]["content"]) + 1
+    tight = chats.build_messages(db, chat, last, s)
+    assert [m["role"] for m in tight] == ["system", "user"]
+
+
+def test_chats_are_private_and_need_finished_transcripts(alice, client, db, configured):
+    (a,) = transcribed(alice, db)
+    chat_id = alice.post("/api/chats", json={"recording_ids": [a], "question": "x"}).json()["id"]
+    r = alice.post("/api/chats", json={"recording_ids": ["no-such-id"], "question": "x"})
+    assert r.json()["error"] == "chat_not_ready"
+    from app.models import User
+    from app.security import hash_password
+
+    db.add(User(username="bob", password_hash=hash_password("bob-password-12")))
+    db.commit()
+    alice.post("/logout", data={"csrf": csrf_from(alice.get("/").text)})
+    login(alice, "bob", "bob-password-12")
+    alice.headers["X-CSRF-Token"] = csrf_from(alice.get("/").text)
+    assert alice.get(f"/api/chats/{chat_id}").status_code == 404
+    assert alice.get(f"/ask/{chat_id}").status_code == 404
+    assert (
+        alice.post("/api/chats", json={"recording_ids": [a], "question": "x"}).json()["error"]
+        == "chat_not_ready"
+    )

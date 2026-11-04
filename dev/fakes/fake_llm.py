@@ -69,7 +69,13 @@ async def chat(request: Request, authorization: str | None = Header(None)):
     messages = body.get("messages") or []
     prompt = "\n".join(str(m.get("content", "")) for m in messages)
     CALLS.append({"model": body.get("model"), "chars": len(prompt), "temperature": body.get("temperature")})
-    text = answer(prompt)
+    system = str(messages[0].get("content", "")) if messages else ""
+    if "Meetings:" in system:  # Ask: a chat over meetings, with earlier turns
+        meetings = len(re.findall(r"^Meeting \d+:", system, re.M))
+        last = str(messages[-1].get("content", "")).strip()
+        text = f"FAKE CHAT ANSWER to: {last} (meetings: {meetings}, earlier turns: {len(messages) - 2})"
+    else:
+        text = answer(prompt)
     return {
         "id": f"fake-{len(CALLS)}",
         "object": "chat.completion",

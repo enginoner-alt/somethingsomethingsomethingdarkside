@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ask.title") }} · {{ app_name }}{% endblock %}
+{% block main_class %}fit{% endblock %}
+{% block content %}
+<div id="ask-app" class="fit-page" data-chat-id="{{ chat_id or '' }}" data-csrf="{{ csrf_token }}"
+     data-locale="{{ locale }}" data-with="{{ with_ids }}" data-i18n='{{ js_strings | tojson }}'>
+  <div class="page-head">
+    <div>
+      <h1>{{ t("ask.title") }}</h1>
+      <p class="lede">{{ t("ask.lede") }}</p>
+    </div>
+  </div>
+
+  <div class="split work ask-layout {{ 'has-chat' if chat_id else 'no-chat' }}">
+    <aside class="col chat-list-col">
+      <a class="button {{ 'primary' if chat_id else '' }} block" href="/ask">{{ t("ask.new") }}</a>
+      <nav id="chat-list" class="chat-list" aria-label="{{ t('ask.chats') }}"></nav>
+    </aside>
+
+    <section class="col chat-main">
+      {% if chat_id %}
+      <div class="thread-head">
+        <p class="small muted" id="thread-meetings"></p>
+        <button class="link" id="chat-delete">{{ t("ask.delete") }}</button>
+      </div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <form id="followup" class="composer">
+        <label class="sr-only" for="followup-q">{{ t("ask.followup") }}</label>
+        <textarea id="followup-q" name="question" rows="2" maxlength="4000" placeholder="{{ t('ask.followup') }}"></textarea>
+        <button class="primary">{{ t("ask.send") }}</button>
+      </form>
+      <p id="ask-error" class="error small" hidden></p>
+      {% else %}
+      <div class="picker">
+        <h2>{{ t("ask.pick") }}</h2>
+        <p class="hint small">{{ t("ask.pick_hint") }}</p>
+        <input type="search" id="source-search" placeholder="{{ t('rec.search') }}" autocomplete="off">
+        <div id="source-list" class="source-list"><p class="muted small">{{ t("rec.loading") }}</p></div>
+        <div class="budget" id="budget">
+          <div class="budget-bar"><div id="budget-fill"></div></div>
+          <span id="budget-text" class="small muted"></span>
+        </div>
+        <form id="new-chat" class="composer">
+          <label class="sr-only" for="new-q">{{ t("ask.question") }}</label>
+          <textarea id="new-q" name="question" rows="2" maxlength="4000" placeholder="{{ t('ask.question') }}"></textarea>
+          <button class="primary" id="new-chat-btn" disabled>{{ t("ask.start") }}</button>
+        </form>
+        <p id="ask-error" class="error small" hidden></p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+<script src="/static/common.js" defer></script>
+<script src="/static/ask.js" defer></script>
+{% endblock %}

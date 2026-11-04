@@ -54,6 +54,8 @@
         <label>{{ t("svc.timeout") }}<input name="llm_timeout_seconds" type="number" value="{{ s.llm_timeout_seconds }}"></label>
       </div>
       <p class="hint small">{{ t("svc.max_chars_hint") }}</p>
+      <label>{{ t("svc.chat_max_chars") }}<input name="chat_max_chars" type="number" min="4000" value="{{ s.chat_max_chars }}">
+        <span class="hint small">{{ t("svc.chat_max_chars_hint") }}</span></label>
     </div>
   </div>
   </section>

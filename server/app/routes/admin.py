@@ -305,6 +305,7 @@ def services_save(
     llm_temperature: Annotated[float, Form()] = 0.2,
     llm_max_chars: Annotated[int, Form()] = 24000,
     llm_timeout_seconds: Annotated[int, Form()] = 300,
+    chat_max_chars: Annotated[int, Form()] = 60000,
     auto_transcribe: Annotated[bool, Form()] = False,
     asr_banned_languages: Annotated[str, Form()] = "",
     asr_fallback_language: Annotated[str, Form()] = "",
@@ -344,6 +345,7 @@ def services_save(
             llm_temperature=max(0.0, min(llm_temperature, 2.0)),
             llm_max_chars=max(2000, min(llm_max_chars, 2_000_000)),
             llm_timeout_seconds=max(10, min(llm_timeout_seconds, 3600)),
+            chat_max_chars=max(4000, min(chat_max_chars, 4_000_000)),
         ),
     )
     log.info("admin %r saved services settings", admin.username)
@@ -360,7 +362,7 @@ def _prompts_page(request, db, admin, saved=False, error=None):
         section="prompts",
         prompts=settings_store.get_prompts(db),
         defaults=insights.DEFAULT_PROMPTS,
-        kinds=insights.KINDS,
+        kinds=tuple(insights.DEFAULT_PROMPTS),
         saved=saved,
         error=error,
     )
@@ -387,7 +389,7 @@ async def services_prompts(
     form = await request.form()
     reset = form.get("reset")
     prompts = {}
-    for kind in insights.KINDS:
+    for kind in insights.DEFAULT_PROMPTS:
         text = str(form.get(f"prompt_{kind}", "")).strip()
         if reset == kind or reset == "all" or not text:
             continue  # falls back to the default

@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app import branding, i18n
 from app.config import get_config
 from app.models import User
-from app.routes import admin, auth, recordings, transcripts
+from app.routes import admin, auth, chats, recordings, transcripts
 from app.tls import ssl_context
 from app.web import LoginRequired, render, require_user, resolve_locale
 
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(recordings.router)
     app.include_router(transcripts.router)
+    app.include_router(chats.router)
 
     if cfg.oidc_enabled:
         ssl_context()  # load trusted CAs now, so the startup log lists them

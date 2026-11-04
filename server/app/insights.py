@@ -52,6 +52,14 @@ DEFAULT_PROMPTS = {
         "Answer the user's question about this meeting in {language}, using only the "
         "transcript.\n\nQuestion: {question}\n\nTranscript:\n{transcript}"
     ),
+    # Ask (chats, app/chats.py): the system message; the conversation follows it.
+    "chat": (
+        "You answer questions about the meetings below, using only what was said in "
+        "them. If the answer isn't there, say so. When you use something, say where it "
+        "was said, like (Meeting 1, 00:12:30). Answer in the language of the user's "
+        "latest question. The user may ask follow-up questions.\n\n"
+        "Meetings:\n{transcript}"
+    ),
 }
 
 PART_PROMPT = (

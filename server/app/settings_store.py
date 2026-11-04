@@ -100,6 +100,9 @@ class ServicesSettings:
     llm_temperature: float = 0.2
     llm_max_chars: int = 24000  # transcript characters per request; longer ones are done in parts
     llm_timeout_seconds: int = 300
+    # Ask: the most characters one chat request may hold (meetings + earlier turns
+    # + question). Keeps users from picking more than the LLM can take.
+    chat_max_chars: int = 60000
 
 
 def get_services(db: Session) -> ServicesSettings:

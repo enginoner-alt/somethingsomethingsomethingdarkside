@@ -63,6 +63,7 @@
         <input id="ask-q" name="question" placeholder="{{ t('tx.ask_placeholder') }}" maxlength="2000">
         <button class="primary">{{ t("tx.ask") }}</button>
       </form>
+      <p class="small"><a href="/ask?with={{ rec.id }}">{{ t("ask.with_others") }} →</a></p>
       <p id="insight-msg" class="error small" hidden></p>
       <div id="insights"></div>
     </aside>
