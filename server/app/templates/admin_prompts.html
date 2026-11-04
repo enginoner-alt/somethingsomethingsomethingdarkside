@@ -1,24 +1,31 @@
 {% extends "base.html" %}
 {% block title %}{{ t("svc.prompts") }} · {{ app_name }}{% endblock %}
+{% from "_panes.html" import pane_links %}
+{% set panes = [] %}{% for kind in kinds %}{% set _ = panes.append(("prompt-" ~ kind, t("tx.kind_" ~ kind))) %}{% endfor %}
+{% block panenav %}{{ pane_links(panes) }}{% endblock %}
 {% block content %}
 {% include "_admin_head.html" %}
+<div data-panes>
 {% if saved %}<p class="notice" role="status">{{ t("dir.saved") }}</p>{% endif %}
 {% if error %}<p class="error" role="alert">{{ t("svc.error." ~ error) }}</p>{% endif %}
 <p class="hint">{{ t("svc.prompts_hint") }}</p>
 <form method="post" action="/admin/services/prompts">
   <input type="hidden" name="csrf" value="{{ csrf_token }}">
   {% for kind in kinds %}
+  <section class="pane" id="prompt-{{ kind }}" data-pane="prompt-{{ kind }}">
   <div class="form-grid">
     <div>
-      <h2>{{ t("tx.kind_" ~ kind) }}</h2>
+      <h2 tabindex="-1">{{ t("tx.kind_" ~ kind) }}</h2>
       {% if prompts[kind] != defaults[kind] %}<p><span class="badge queued">{{ t("svc.customised") }}</span></p>{% endif %}
       <button name="reset" value="{{ kind }}" class="link">{{ t("svc.reset_one") }}</button>
     </div>
     <label><span class="sr-only">{{ t("tx.kind_" ~ kind) }}</span>
-      <textarea name="prompt_{{ kind }}" rows="7" class="mono">{{ prompts[kind] }}</textarea>
+      <textarea name="prompt_{{ kind }}" rows="14" class="mono">{{ prompts[kind] }}</textarea>
     </label>
   </div>
+  </section>
   {% endfor %}
-  <div class="actions"><button name="reset" value="all" class="quiet">{{ t("svc.reset_all") }}</button><button class="primary">{{ t("dir.save") }}</button></div>
+  <div class="actions sticky-actions"><button name="reset" value="all" class="quiet">{{ t("svc.reset_all") }}</button><button class="primary">{{ t("dir.save") }}</button></div>
 </form>
+</div>
 {% endblock %}

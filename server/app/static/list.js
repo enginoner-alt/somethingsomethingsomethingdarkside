@@ -4,8 +4,9 @@
   if (!root) return;
   const { t, errText, api, el, dur, date } = DS(root);
   const $ = (id) => document.getElementById(id);
-  const list = $("rec-list"), search = $("rec-search");
-  let rows = [];
+  const list = $("rec-list"), search = $("rec-search"), pager = $("rec-pager");
+  const PAGE = 25;
+  let rows = [], total = 0, offset = 0, timer = null;
 
   const STATE_BADGE = { uploaded: "done", recording: "running", interrupted: "queued", failed: "failed" };
 
@@ -26,23 +27,34 @@
   };
 
   const draw = () => {
-    const q = search.value.trim().toLocaleLowerCase();
-    const shown = q ? rows.filter((r) => r.title.toLocaleLowerCase().includes(q)) : rows;
-    if (!rows.length) {
+    const q = search.value.trim();
+    if (!rows.length && !q && !offset) {
       list.replaceChildren(el("div", { class: "empty" },
         el("h2", {}, t("rec.empty")), el("p", {}, t("rec.empty_hint")),
         el("a", { class: "button primary", href: "/record" }, t("rec.new"))));
-      return;
+    } else {
+      list.replaceChildren(...(rows.length ? rows.map(row) : [el("p", { class: "empty" }, t("rec.no_match"))]));
     }
-    list.replaceChildren(...(shown.length ? shown.map(row) : [el("p", { class: "empty" }, t("rec.no_match"))]));
+    // Pages of 25 instead of one endless list.
+    const pages = Math.max(1, Math.ceil(total / PAGE)), page = Math.floor(offset / PAGE) + 1;
+    pager.replaceChildren(...(pages > 1 ? [
+      page > 1 ? el("button", { class: "quiet", onclick: () => go(offset - PAGE) }, `← ${t("common.newer")}`) : el("span"),
+      el("span", { class: "muted small" }, t("common.page_of", { page, pages })),
+      page < pages ? el("button", { class: "quiet", onclick: () => go(offset + PAGE) }, `${t("common.older")} →`) : el("span"),
+    ] : []));
   };
+  const go = (o) => { offset = Math.max(0, o); refresh(); window.scrollTo(0, 0); };
 
+  let poll = null;
   const refresh = async () => {
-    const res = await api("GET", "/api/recordings");
+    const q = encodeURIComponent(search.value.trim());
+    const res = await api("GET", `/api/recordings?limit=${PAGE}&offset=${offset}&q=${q}`);
     if (!res.ok) { list.replaceChildren(el("p", { class: "error" }, errText(res))); return; }
     rows = res.data;
+    total = Number(res.headers?.get("X-Total-Count") ?? rows.length);
     draw();
-    if (rows.some((r) => r.status === "recording")) setTimeout(refresh, 5000);
+    clearTimeout(poll);
+    if (rows.some((r) => r.status === "recording")) poll = setTimeout(refresh, 5000);
   };
 
   const remove = async (id) => {
@@ -51,7 +63,7 @@
     refresh();
   };
 
-  search.addEventListener("input", draw);
+  search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { offset = 0; refresh(); }, 250); });
 
   const form = $("upload-form"), file = $("upload-file"), status = $("upload-status"), consent = $("consent");
   form.addEventListener("submit", async (ev) => {

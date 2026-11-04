@@ -338,5 +338,16 @@
   "err.no_such_channel": "Channel {n} was requested but the recording has {channels}.",
   "err.ffmpeg": "The audio couldn't be converted.",
   "err.os": "The server couldn't read the audio file.",
-  "err.no_speakers": "Speakers were requested but the service returned none (HF_TOKEN set on the service?)."
+  "err.no_speakers": "Speakers were requested but the service returned none (HF_TOKEN set on the service?).",
+  "nav.menu": "Menu",
+  "admin.search": "Search users",
+  "admin.search_button": "Search",
+  "admin.user_count": "{n} users",
+  "common.pages": "Pages",
+  "common.previous": "Previous",
+  "common.next": "Next",
+  "common.newer": "Newer",
+  "common.older": "Older",
+  "common.page_of": "Page {page} of {pages}",
+  "tx.view": "View"
 }

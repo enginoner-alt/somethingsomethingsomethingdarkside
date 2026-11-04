@@ -1,0 +1,6 @@
+{# Pane links for the side navigation: panes = [(id, label), ...] #}
+{% macro pane_links(panes) %}
+<div class="pane-links">
+  {% for id, label in panes %}<a href="#{{ id }}" data-pane-link="{{ id }}">{{ label }}</a>{% endfor %}
+</div>
+{% endmacro %}

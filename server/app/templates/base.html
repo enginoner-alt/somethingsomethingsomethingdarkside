@@ -6,41 +6,69 @@
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <link rel="preload" href="/static/fonts/montserrat-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/app.css">
+  <script>document.documentElement.classList.add("js")</script>
 </head>
 {% set path = request.url.path %}
-<body>
-  <header class="topbar">
+{% set admin_sections = [("users", "/admin"), ("jobs", "/admin/jobs"), ("directory", "/admin/directory"), ("services", "/admin/services"), ("prompts", "/admin/prompts")] %}
+{% macro lang_form(id) %}
+  <form method="post" action="/lang" class="lang-form">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="{{ path }}">
+    <label class="sr-only" for="{{ id }}">{{ t("nav.language") }}</label>
+    <select id="{{ id }}" name="locale" onchange="this.form.submit()">
+      {% for code, name in locales.items() %}
+        <option value="{{ code }}" {% if code == locale %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button class="quiet">{{ t("common.ok") }}</button></noscript>
+  </form>
+{% endmacro %}
+<body class="{{ 'has-nav' if user else 'no-nav' }}">
+{% if user %}
+  {# Phones: a slim bar with the menu button; the side navigation becomes a drawer. #}
+  <header class="mobilebar">
+    <button class="menu-btn quiet" id="menu-btn" aria-controls="sidenav" aria-expanded="false" aria-label="{{ t('nav.menu') }}">
+      <span class="burger" aria-hidden="true"></span>
+    </button>
     <a class="brand" href="/">{{ app_name }}</a>
-    {% if user %}
-    <nav class="nav" aria-label="{{ t('nav.main') }}">
+  </header>
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="sidenav" id="sidenav" aria-label="{{ t('nav.main') }}">
+    <a class="brand" href="/">{{ app_name }}</a>
+    <nav class="navlist">
       <a href="/" {% if path == "/" or path.startswith("/recordings") %}class="active" aria-current="page"{% endif %}>{{ t("nav.recordings") }}</a>
-      <a href="/record" {% if path == "/record" %}class="active" aria-current="page"{% endif %}>{{ t("nav.record") }}</a>
-      {% if user.is_admin %}<a href="/admin" {% if path.startswith("/admin") %}class="active" aria-current="page"{% endif %}>{{ t("nav.admin") }}</a>{% endif %}
-    </nav>
-    {% else %}<span class="nav"></span>{% endif %}
-    <div class="account">
-      {% if user %}<span class="who">{{ user.display_name or user.username }}</span>{% endif %}
-      <form method="post" action="/lang" class="inline">
-        <input type="hidden" name="csrf" value="{{ csrf_token }}">
-        <input type="hidden" name="next" value="{{ path }}">
-        <label class="sr-only" for="lang">{{ t("nav.language") }}</label>
-        <select id="lang" name="locale" onchange="this.form.submit()">
-          {% for code, name in locales.items() %}
-            <option value="{{ code }}" {% if code == locale %}selected{% endif %}>{{ name }}</option>
+      <a href="/record" {% if path == "/record" %}class="active" aria-current="page"{% endif %}><span class="dot" aria-hidden="true"></span>{{ t("rec.new") }}</a>
+      {% if user.is_admin %}
+        <a href="/admin" {% if path.startswith("/admin") %}class="open"{% endif %}>{{ t("nav.admin") }}</a>
+        {% if path.startswith("/admin") %}
+        <div class="subnav-list">
+          {% for key, href in admin_sections %}
+            <a href="{{ href }}" {% if section == key %}class="active" aria-current="page"{% endif %}>{{ t("admin.section." ~ key) }}</a>
+            {% if section == key %}{% block panenav %}{% endblock %}{% endif %}
           {% endfor %}
-        </select>
-        <noscript><button class="quiet">{{ t("common.ok") }}</button></noscript>
-      </form>
-      {% if user %}
-      <form method="post" action="/logout" class="inline">
+        </div>
+        {% endif %}
+      {% endif %}
+    </nav>
+    <div class="sidenav-foot">
+      <div class="who">{{ user.display_name or user.username }}</div>
+      {{ lang_form("lang") }}
+      <form method="post" action="/logout">
         <input type="hidden" name="csrf" value="{{ csrf_token }}">
         <button class="quiet">{{ t("nav.logout") }}</button>
       </form>
-      {% endif %}
     </div>
+  </aside>
+{% else %}
+  <header class="topbar">
+    <a class="brand" href="/">{{ app_name }}</a>
+    <span class="grow"></span>
+    {{ lang_form("lang") }}
   </header>
+{% endif %}
   <main class="{% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  {% if user %}<script src="/static/shell.js" defer></script>{% endif %}
 </body>
 </html>

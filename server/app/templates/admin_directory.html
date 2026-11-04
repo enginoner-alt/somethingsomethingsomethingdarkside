@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ t("dir.title") }} · {{ app_name }}{% endblock %}
+{% from "_panes.html" import pane_links %}
+{% set panes = [("status", t("dir.status")), ("servers", t("dir.ad_settings")), ("account", t("dir.account")), ("access", t("dir.access")), ("verify-ad", t("dir.verify_ad"))] %}
+{% block panenav %}{{ pane_links(panes) }}{% endblock %}
 {% block content %}
 {% include "_admin_head.html" %}
+{% set initial = "status" if verify_title == "SSO" else "verify-ad" if verify_title == "AD" else "" %}
+<div data-panes data-initial-pane="{{ initial }}">
 {% if saved %}<p class="notice" role="status">{{ t("dir.saved") }}</p>{% endif %}
 {% if error %}<p class="error" role="alert">{{ t("dir.error." ~ error) }}</p>{% endif %}
 
+<section class="pane" id="status" data-pane="status">
 <div class="form-grid">
-  <div><h2>{{ t("dir.status") }}</h2><p>{{ t("dir.rule") }}</p></div>
+  <div><h2 tabindex="-1">{{ t("dir.status") }}</h2><p>{{ t("dir.rule") }}</p></div>
   <div class="stack">
     <div class="table-wrap"><table>
       <thead><tr><th>{{ t("dir.method") }}</th><th>{{ t("dir.configured") }}</th><th>{{ t("dir.working") }}</th></tr></thead>
@@ -29,13 +35,14 @@
     </form>
   </div>
 </div>
-
-{% include "_steps.html" %}
+{% if verify_title == "SSO" %}{% include "_steps.html" %}{% endif %}
+</section>
 
 <form method="post" action="/admin/directory">
   <input type="hidden" name="csrf" value="{{ csrf_token }}">
+  <section class="pane" id="servers" data-pane="servers">
   <div class="form-grid">
-    <div><h2>{{ t("dir.ad_settings") }}</h2><p>{{ t("dir.ad_settings_hint") }}</p></div>
+    <div><h2 tabindex="-1">{{ t("dir.ad_settings") }}</h2><p>{{ t("dir.ad_settings_hint") }}</p></div>
     <div class="stack">
       {% if problems %}<p class="error">{{ t("dir.problems") }}
         {% for p in problems %}{{ t("dir.problem." ~ p) }}{% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
@@ -47,8 +54,10 @@
       <label class="check"><input type="checkbox" name="start_tls" {% if d.start_tls %}checked{% endif %}> {{ t("dir.start_tls") }}</label>
     </div>
   </div>
+  </section>
+  <section class="pane" id="account" data-pane="account">
   <div class="form-grid">
-    <div><h2>{{ t("dir.account") }}</h2><p>{{ t("dir.secret_hint") }}</p></div>
+    <div><h2 tabindex="-1">{{ t("dir.account") }}</h2><p>{{ t("dir.secret_hint") }}</p></div>
     <div class="stack">
       <label>{{ t("dir.bind_dn") }}
         <input name="bind_dn" value="{{ d.bind_dn }}" placeholder="CN=svc-darkside,OU=Service Accounts,DC=corp,DC=local">
@@ -67,8 +76,10 @@
       </label>
     </div>
   </div>
+  </section>
+  <section class="pane" id="access" data-pane="access">
   <div class="form-grid">
-    <div><h2>{{ t("dir.access") }}</h2><p>{{ t("dir.group_hint") }}</p></div>
+    <div><h2 tabindex="-1">{{ t("dir.access") }}</h2><p>{{ t("dir.group_hint") }}</p></div>
     <div class="stack">
       <div class="fields">
         <label>{{ t("dir.required_group") }}
@@ -98,11 +109,13 @@
       </details>
     </div>
   </div>
-  <div class="actions"><button class="primary">{{ t("dir.save") }}</button></div>
+  </section>
+  <div class="actions sticky-actions" data-form-actions><button class="primary">{{ t("dir.save") }}</button></div>
 </form>
 
-<div class="form-grid" style="margin-top: 24px">
-  <div><h2>{{ t("dir.verify_ad") }}</h2><p>{{ t("dir.verify_ad_hint") }}</p></div>
+<section class="pane" id="verify-ad" data-pane="verify-ad">
+<div class="form-grid">
+  <div><h2 tabindex="-1">{{ t("dir.verify_ad") }}</h2><p>{{ t("dir.verify_ad_hint") }}</p></div>
   <form method="post" action="/admin/directory/verify-ad" class="stack">
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
     <div class="fields">
@@ -111,5 +124,8 @@
     </div>
     <div><button>{{ t("dir.verify_ad") }}</button></div>
   </form>
+</div>
+{% if verify_title == "AD" %}{% include "_steps.html" %}{% endif %}
+</section>
 </div>
 {% endblock %}

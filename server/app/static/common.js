@@ -38,7 +38,7 @@ window.DS = (root) => {
     }
     let data = null;
     try { data = await res.json(); } catch { /* empty body */ }
-    return { ok: res.ok, status: res.status, data };
+    return { ok: res.ok, status: res.status, data, headers: res.headers };
   };
 
   const el = (tag, attrs = {}, ...kids) => {

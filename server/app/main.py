@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     def home(request: Request, user: Annotated[User, Depends(require_user)]):
-        js = i18n.strings(resolve_locale(request, user), "rec.", "err.")
+        js = i18n.strings(resolve_locale(request, user), "rec.", "err.", "common.")
         return render(request, "home.html", user, js_strings=js)
 
     @app.get("/record")

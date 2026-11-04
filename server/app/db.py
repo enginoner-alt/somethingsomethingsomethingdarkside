@@ -31,3 +31,10 @@ def get_db() -> Iterator[Session]:
     """FastAPI dependency: one session per request."""
     with get_sessionmaker()() as session:
         yield session
+
+
+def like_pattern(text: str) -> str:
+    """`text` as a case-insensitive "contains" pattern, with % and _ taken literally
+    (use with escape="\\")."""
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"

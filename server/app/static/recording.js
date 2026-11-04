@@ -134,5 +134,12 @@
     });
   });
 
+  // Phones: Transcript / Insights tabs.
+  const work = $("work");
+  document.querySelectorAll(".view-tabs [data-view]").forEach((b) => b.addEventListener("click", () => {
+    work.dataset.view = b.dataset.view;
+    document.querySelectorAll(".view-tabs [data-view]").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  }));
+
   loadTranscript().then(loadInsights);
 })();

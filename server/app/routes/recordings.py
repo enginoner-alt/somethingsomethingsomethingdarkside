@@ -2,15 +2,15 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import pipeline, recordings
 from app.config import get_config
-from app.db import get_db
+from app.db import get_db, like_pattern
 from app.models import Recording, User
 from app.recordings import RecordingError
 from app.web import require_user, verify_csrf_header
@@ -58,16 +58,21 @@ def as_dict(rec: Recording) -> dict:
     }
 
 
-def list_for(db: Session, user: User) -> list[Recording]:
+def list_for(
+    db: Session, user: User, q: str = "", limit: int | None = None, offset: int = 0
+) -> tuple[list[Recording], int]:
+    """The user's recordings, newest first; optionally a title search and one page."""
     for rec in recordings.close_stale(db, user.id):
         pipeline.maybe_auto_transcribe(db, rec)
-    return list(
-        db.scalars(
-            select(Recording)
-            .where(Recording.user_id == user.id, Recording.deleted_at.is_(None))
-            .order_by(Recording.created_at.desc())
-        )
-    )
+    where = [Recording.user_id == user.id, Recording.deleted_at.is_(None)]
+    if q.strip():
+        pattern = like_pattern(q.strip())
+        where.append(Recording.title.ilike(pattern, escape="\\"))
+    total = db.scalar(select(func.count()).select_from(Recording).where(*where)) or 0
+    query = select(Recording).where(*where).order_by(Recording.created_at.desc()).offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    return list(db.scalars(query)), total
 
 
 class CreateBody(BaseModel):
@@ -81,8 +86,18 @@ class FinalizeBody(BaseModel):
 
 
 @router.get("/api/recordings")
-def api_list(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(require_user)]):
-    return [as_dict(r) for r in list_for(db, user)]
+def api_list(
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_user)],
+    q: str = "",
+    limit: Annotated[int | None, Query(ge=1, le=200)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """A JSON list as before; with ?limit= one page of it. X-Total-Count has the total."""
+    rows, total = list_for(db, user, q, limit, offset)
+    response.headers["X-Total-Count"] = str(total)
+    return [as_dict(r) for r in rows]
 
 
 @router.post("/api/recordings", status_code=201, dependencies=[Depends(verify_csrf_header)])

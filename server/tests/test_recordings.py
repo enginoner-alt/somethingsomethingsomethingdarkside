@@ -279,3 +279,23 @@ def test_login_logo_slot(client, tmp_path, monkeypatch):
     (tmp_path / "logo.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
     assert client.get("/branding/logo").status_code == 200
     assert 'src="/branding/logo"' in client.get("/login").text
+
+
+def test_list_pages_and_search(alice):
+    page = alice.get("/").text
+    import re
+
+    csrf = re.search(r'data-csrf="([^"]+)"', page).group(1)
+    for i in range(30):
+        r = alice.post(
+            "/api/recordings",
+            json={"mime_type": "audio/webm", "consent": True, "title": f"Meeting {i:02d}"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert r.status_code == 201
+    first = alice.get("/api/recordings?limit=25")
+    assert len(first.json()) == 25 and first.headers["x-total-count"] == "30"
+    assert len(alice.get("/api/recordings?limit=25&offset=25").json()) == 5
+    hit = alice.get("/api/recordings?limit=25&q=meeting 07")
+    assert [r["title"] for r in hit.json()] == ["Meeting 07"]
+    assert len(alice.get("/api/recordings").json()) == 30  # no limit: everything, as before

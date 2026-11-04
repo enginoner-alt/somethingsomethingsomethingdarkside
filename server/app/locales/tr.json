@@ -338,5 +338,16 @@
   "err.no_such_channel": "{n}. kanal istendi ama kayıtta {channels} kanal var.",
   "err.ffmpeg": "Ses dönüştürülemedi.",
   "err.os": "Sunucu ses dosyasını okuyamadı.",
-  "err.no_speakers": "Konuşmacı ayrımı istendi ama servis hiç konuşmacı döndürmedi (serviste HF_TOKEN ayarlı mı?)."
+  "err.no_speakers": "Konuşmacı ayrımı istendi ama servis hiç konuşmacı döndürmedi (serviste HF_TOKEN ayarlı mı?).",
+  "nav.menu": "Menü",
+  "admin.search": "Kullanıcı ara",
+  "admin.search_button": "Ara",
+  "admin.user_count": "{n} kullanıcı",
+  "common.pages": "Sayfalar",
+  "common.previous": "Önceki",
+  "common.next": "Sonraki",
+  "common.newer": "Daha yeni",
+  "common.older": "Daha eski",
+  "common.page_of": "Sayfa {page} / {pages}",
+  "tx.view": "Görünüm"
 }

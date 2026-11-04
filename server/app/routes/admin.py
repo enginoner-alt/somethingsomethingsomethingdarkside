@@ -5,11 +5,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import directory, jobs, login_policy, secrets, settings_store
-from app.db import get_db
+from app.db import get_db, like_pattern
 from app.models import Job, Queue, User
 from app.security import hash_password
 from app.web import render, require_admin, verify_csrf
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/admin")
 log = logging.getLogger("admin")
 
 MIN_PASSWORD_LENGTH = 10
+USERS_PER_PAGE = 25
 
 
 def _job_dict(job: Job) -> dict:
@@ -44,14 +45,37 @@ def admin_index(
     db: Annotated[Session, Depends(get_db)],
     admin: Annotated[User, Depends(require_admin)],
     error: str | None = None,
+    q: str = "",
+    page: int = 1,
 ):
-    users = list(db.scalars(select(User).order_by(User.username)))
+    where = []
+    if q.strip():
+        like = like_pattern(q.strip())
+        where.append(
+            User.username.ilike(like, escape="\\") | User.display_name.ilike(like, escape="\\")
+        )
+    total = db.scalar(select(func.count()).select_from(User).where(*where)) or 0
+    pages = max(1, -(-total // USERS_PER_PAGE))
+    page = min(max(1, page), pages)
+    users = list(
+        db.scalars(
+            select(User)
+            .where(*where)
+            .order_by(User.username)
+            .offset((page - 1) * USERS_PER_PAGE)
+            .limit(USERS_PER_PAGE)
+        )
+    )
     return render(
         request,
         "admin.html",
         admin,
         section="users",
         users=users,
+        q=q,
+        page=page,
+        pages=pages,
+        total=total,
         error=error,
         min_password_length=MIN_PASSWORD_LENGTH,
     )

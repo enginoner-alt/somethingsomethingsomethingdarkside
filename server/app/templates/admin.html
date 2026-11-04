@@ -3,6 +3,13 @@
 {% block content %}
 {% include "_admin_head.html" %}
 {% if error %}<p class="error" role="alert">{{ t("admin.error." ~ error) }}</p>{% endif %}
+<form method="get" action="/admin" class="toolbar" role="search">
+  <label class="sr-only" for="user-q">{{ t("admin.search") }}</label>
+  <input type="search" id="user-q" name="q" value="{{ q }}" placeholder="{{ t('admin.search') }}">
+  <button class="quiet">{{ t("admin.search_button") }}</button>
+  <span class="grow"></span>
+  <span class="muted small">{{ t("admin.user_count", n=total) }}</span>
+</form>
 
 <div class="table-wrap">
 <table>
@@ -31,6 +38,13 @@
   </tbody>
 </table>
 </div>
+{% if pages > 1 %}
+<nav class="pager" aria-label="{{ t('common.pages') }}">
+  {% if page > 1 %}<a class="button quiet" href="?q={{ q | urlencode }}&page={{ page - 1 }}">← {{ t("common.previous") }}</a>{% endif %}
+  <span class="muted small">{{ t("common.page_of", page=page, pages=pages) }}</span>
+  {% if page < pages %}<a class="button quiet" href="?q={{ q | urlencode }}&page={{ page + 1 }}">{{ t("common.next") }} →</a>{% endif %}
+</nav>
+{% endif %}
 
 <div class="form-grid" style="margin-top: 32px">
   <div><h2>{{ t("admin.create_user") }}</h2><p>{{ t("admin.create_user_hint") }}</p></div>

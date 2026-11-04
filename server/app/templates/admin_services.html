@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ t("svc.title") }} · {{ app_name }}{% endblock %}
+{% from "_panes.html" import pane_links %}
+{% set panes = [("asr", t("svc.asr")), ("llm", t("svc.llm")), ("verify", t("svc.verify"))] %}
+{% block panenav %}{{ pane_links(panes) }}{% endblock %}
 {% block content %}
 {% include "_admin_head.html" %}
+<div data-panes data-initial-pane="{{ 'verify' if steps else '' }}">
 {% if saved %}<p class="notice" role="status">{{ t("dir.saved") }}</p>{% endif %}
 {% if error %}<p class="error" role="alert">{{ t("svc.error." ~ error) }}</p>{% endif %}
-{% include "_steps.html" %}
-
 <form method="post" action="/admin/services">
   <input type="hidden" name="csrf" value="{{ csrf_token }}">
+  <section class="pane" id="asr" data-pane="asr">
   <div class="form-grid">
-    <div><h2>{{ t("svc.asr") }}</h2><p>{{ t("svc.asr_hint") }}</p></div>
+    <div><h2 tabindex="-1">{{ t("svc.asr") }}</h2><p>{{ t("svc.asr_hint") }}</p></div>
     <div class="stack">
       <label>{{ t("svc.asr_url") }}<input name="asr_url" value="{{ s.asr_url }}" placeholder="http://whisperx:9000"></label>
       <label class="check"><input type="checkbox" name="auto_transcribe" {% if s.auto_transcribe %}checked{% endif %}> {{ t("svc.auto_transcribe") }}</label>
@@ -26,9 +29,10 @@
       <label>{{ t("svc.initial_prompt") }}<input name="asr_initial_prompt" value="{{ s.asr_initial_prompt }}"></label>
     </div>
   </div>
-
+  </section>
+  <section class="pane" id="llm" data-pane="llm">
   <div class="form-grid">
-    <div><h2>{{ t("svc.llm") }}</h2><p>{{ t("svc.llm_hint") }}</p></div>
+    <div><h2 tabindex="-1">{{ t("svc.llm") }}</h2><p>{{ t("svc.llm_hint") }}</p></div>
     <div class="stack">
       <div class="fields">
         <label>{{ t("svc.llm_url") }}<input name="llm_base_url" value="{{ s.llm_base_url }}" placeholder="http://llm:8000/v1"></label>
@@ -48,14 +52,19 @@
       <p class="hint small">{{ t("svc.max_chars_hint") }}</p>
     </div>
   </div>
-  <div class="actions"><button class="primary">{{ t("dir.save") }}</button></div>
+  </section>
+  <div class="actions sticky-actions" data-form-actions><button class="primary">{{ t("dir.save") }}</button></div>
 </form>
 
-<div class="form-grid" style="margin-top: 24px">
-  <div><h2>{{ t("svc.verify") }}</h2><p>{{ t("svc.verify_hint") }}</p></div>
+<section class="pane" id="verify" data-pane="verify">
+<div class="form-grid">
+  <div><h2 tabindex="-1">{{ t("svc.verify") }}</h2><p>{{ t("svc.verify_hint") }}</p></div>
   <div class="row">
     <form method="post" action="/admin/services/verify-asr" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button>{{ t("svc.verify_asr") }}</button></form>
     <form method="post" action="/admin/services/verify-llm" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button>{{ t("svc.verify_llm") }}</button></form>
   </div>
+</div>
+{% include "_steps.html" %}
+</section>
 </div>
 {% endblock %}
