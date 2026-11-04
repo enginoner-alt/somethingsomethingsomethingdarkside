@@ -2,81 +2,79 @@
 
 GitHub renders these Mermaid diagrams directly. Legend used throughout:
 
-- **Solid green**: built and tested (M0, M1)
+- **Solid green**: built and tested (M0, M1). **Thick green border**: also runs the egress guard
 - **Dashed blue**: planned (M2+), shape agreed in [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Grey**: external, not part of this repo (you run or choose it)
 
 ## 1. System overview
 
-Containers talk to each other over the network (decision D25). Only Caddy is
-reachable from outside. Workers never talk to browsers: they claim jobs from
-Postgres and write results back there.
+Independent stacks joined only by Docker networks (D25, D26). Only the app
+stack starts connections, so only it holds URLs. The passive services
+(Postgres, WhisperX) sit on internal networks with no internet and run an
+**egress guard** that drops any connection they try to open. Arrows point
+from the side that starts the connection. Details: [NETWORK.md](NETWORK.md).
 
 ```mermaid
 flowchart TB
-    subgraph clients["Clients: any device, any mic"]
+    browsers["Browsers: laptop / phone<br/>any mic: XVF3800 USB, built-in, 3.5 mm"]
+
+    subgraph appstack["app stack (ours): the only one with URLs"]
         direction LR
-        mic["Mic: ReSpeaker XVF3800 USB,<br/>built-in, 3.5 mm"]
-        laptop["Laptop browser<br/>Windows / Linux / macOS"]
-        phone["Phone browser<br/>Android / iOS"]
-        mic -. "getUserMedia" .-> laptop
+        caddy["caddy<br/>TLS, only published ports 80/443"]
+        api["api: FastAPI<br/>UI, login + SSO, admin,<br/>chunk upload (M2)"]
+        wasr["worker-asr<br/>transcription jobs"]
+        wllm["worker-llm<br/>insight jobs"]
+        caddy -- "darkside-edge" --> api
     end
 
-    idp["Identity provider: optional<br/>Entra / Ping / NetIQ / ADSSP / Keycloak<br/>AD/LDAP + MFA live here"]
+    subgraph dbstack["db stack: passive, no URLs"]
+        pg[("postgres<br/>official image + egress guard<br/>no internet")]
+    end
 
-    subgraph host["docker compose: app host"]
+    subgraph asrstack["asr stack (M3): passive, no URLs"]
+        asr["WhisperX service<br/>community GPU image<br/>+ egress guard, no internet"]
+    end
+
+    subgraph ext["Elsewhere: URLs in the app's settings"]
         direction TB
-        caddy["caddy<br/>TLS: deploy/certs<br/>HSTS, security headers"]
-        ca["deploy/ca<br/>extra trusted CAs"]
-        api["api: FastAPI<br/>web UI, login + SSO, admin panel,<br/>throttling, signed-cookie sessions"]
-        upload["chunk upload + reassembly<br/>ffmpeg normalise"]
-        pg[("postgres: official image<br/>users, login-failure counters,<br/>job queue, transcripts, insights")]
-        audio[("volume: audio<br/>original recordings")]
-        worker["worker: ours, small, no GPU<br/>claims jobs, calls services,<br/>stores results"]
-
-        caddy -- ":8000" --> api
-        ca -. "trusted by" .-> api
-        api --> upload
-        upload -- "write" --> audio
-        api -- "SQL" --> pg
-        worker -- "claim jobs SKIP LOCKED,<br/>save results" --> pg
-        worker -- "read" --> audio
-    end
-
-    subgraph services["Services: same box or elsewhere, each just a URL"]
-        direction LR
-        asr["WhisperX service<br/>community GPU image<br/>transcribe + align + diarize"]
-        models[("volume: models")]
-        llm["LLM server<br/>OpenAI-compatible API"]
+        idp["Identity provider (optional)<br/>Entra / Ping / NetIQ / ADSSP"]
+        llm["LLM server<br/>OpenAI-compatible"]
         tts["TTS service<br/>podcast engine, later"]
-        asr --- models
     end
 
-    laptop -- "HTTPS 443" --> caddy
-    phone -- "HTTPS 443" --> caddy
-    laptop -. "login redirect" .-> idp
-    phone -. "login redirect" .-> idp
-    api -- "OIDC over HTTPS" --> idp
-    worker -- "HTTP: audio in,<br/>segments + speakers out" --> asr
-    worker -- "HTTPS" --> llm
-    worker -. "HTTPS, later" .-> tts
+    browsers -- "HTTPS 443" --> caddy
+    api -- "darkside-db (internal)" --> pg
+    wasr -- "darkside-db" --> pg
+    wllm -- "darkside-db" --> pg
+    wasr -- "darkside-asr (internal)" --> asr
+    api -- "darkside-out: OIDC" --> idp
+    wllm -- "darkside-out" --> llm
+    wllm -. "darkside-out, later" .-> tts
 
     classDef built fill:#d3f9d8,stroke:#2b8a3e,color:#0b3d17
     classDef planned fill:#e7f5ff,stroke:#1c7ed6,stroke-dasharray:5 4,color:#0b2e4f
     classDef external fill:#f1f3f5,stroke:#868e96,color:#212529
-    class caddy,api,pg,ca built
-    class upload,audio,worker planned
-    class asr,models,llm,tts planned
-    class idp,phone,laptop,mic external
-    style clients fill:#fafafa,stroke:#adb5bd
-    style host fill:#fafafa,stroke:#adb5bd
-    style services fill:#fafafa,stroke:#adb5bd
+    classDef guarded fill:#d3f9d8,stroke:#2b8a3e,stroke-width:3px,color:#0b3d17
+    classDef guardedPlanned fill:#e7f5ff,stroke:#1c7ed6,stroke-width:3px,stroke-dasharray:5 4,color:#0b2e4f
+    class caddy,api built
+    class pg guarded
+    class asr guardedPlanned
+    class wasr,wllm,llm,tts planned
+    class idp,browsers external
+    style appstack fill:#fafafa,stroke:#2b8a3e
+    style dbstack fill:#fafafa,stroke:#2b8a3e
+    style asrstack fill:#fafafa,stroke:#1c7ed6,stroke-dasharray:5 4
+    style ext fill:#fafafa,stroke:#adb5bd
 ```
 
-The worker is partly built: the job queue, claiming, retries, heartbeats and
-stale-job recovery exist and are tested. It's shown as planned because its
-real work (calling the WhisperX and LLM services) arrives in M3/M4. Today it
-only runs test jobs.
+Not drawn, to keep it readable: the audio volume (M2; written by api, read by
+worker-asr), the WhisperX models volume, and `deploy/ca` (extra CAs the app
+trusts, e.g. for your IdP).
+
+The workers are partly built: the job queue, claiming, retries, heartbeats and
+stale-job recovery exist and are tested. They're shown as planned because
+their real work (calling the WhisperX and LLM services) arrives in M3/M4.
+Today they only run test jobs.
 
 ## 2. Deployment options
 
@@ -84,22 +82,28 @@ only runs test jobs.
 
 ```mermaid
 flowchart TB
-    subgraph laptop["Laptop: Windows + WSL2, RTX 4060 8 GB, 16 GB RAM"]
+    users["Browsers on the LAN"] -- "HTTPS" --> caddy
+    subgraph laptop["Laptop: Windows + WSL2, RTX 4060 8 GB, 16 GB RAM: ./darkside up"]
         direction LR
-        subgraph compose["docker compose"]
+        subgraph app["app stack"]
             caddy --> api
-            api --> pg[("postgres")]
-            worker --> pg
+            worker["workers"]
         end
-        asr["WhisperX service<br/>GPU"]
-        worker --> asr
+        subgraph db["db stack"]
+            pg[("postgres")]
+        end
+        subgraph asr["asr stack (M3)"]
+            whisperx["WhisperX<br/>GPU"]
+        end
+        api --> pg
+        worker --> pg
+        worker --> whisperx
     end
     llm["LLM server<br/>private network"]
     worker --> llm
-    users["Browsers on the LAN"] -- "HTTPS" --> caddy
 
     classDef gpu fill:#fff3bf,stroke:#f08c00,color:#5c3c00
-    class asr gpu
+    class whisperx gpu
 ```
 
 ### Production: split out as needed
@@ -144,9 +148,11 @@ flowchart TB
     class pg,storage todo
 ```
 
-Pointing `DATABASE_URL` at an external Postgres is planned but not yet wired
-into `docker-compose.yml` (see D25). More GPUs = more WhisperX services and
-workers; they all share the Postgres job queue.
+To use an external Postgres, set `DATABASE_URL` in the app's `.env` and don't
+start the `db` stack. Across machines, only allow each passive service's port
+from its partner (see [NETWORK.md](NETWORK.md#splitting-stacks-across-machines);
+not tested yet). More GPUs = more WhisperX services and workers, all sharing
+the Postgres job queue.
 
 ## 3. Recording → transcript → insights
 

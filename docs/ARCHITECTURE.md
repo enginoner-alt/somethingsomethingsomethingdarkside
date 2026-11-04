@@ -37,32 +37,31 @@ Diagrams of all of this: [DIAGRAMS.md](DIAGRAMS.md).
 | D22 | Channels / DoA | Transcribe a single channel. Browser uploads what it gets (mono or stereo, untouched); server picks the channel at ffmpeg conversion (`left` / `right` / `mix`, admin default, per-recording override on re-transcribe). No DoA: not in the audio stream, not reachable from a browser, laggy, and pyannote diarizes by voice. |
 | D23 | Priority | Owner decision: safe login (M1) → record and push (M2) → transcription → insights. |
 | D24 | Group changes | IdP groups are read at login. Keycloak's LDAP cache policy must be `NO_CACHE` (or short), or removals don't apply. To cut someone off immediately, also disable them in the app (ends sessions at once). |
-| D25 | Service split | Separate containers that talk over the network; use community images where they exist. **Postgres:** official image (pointing at an external server instead is planned: make `DATABASE_URL` overridable in compose, not done yet). **Transcription:** a community WhisperX HTTP service (first candidate: `onerahmet/openai-whisper-asr-webservice` GPU image with `ASR_ENGINE=whisperx`), pinned to a tested version, reached through a swappable connector. **LLM:** any OpenAI-compatible endpoint. **TTS (later, podcast engine):** same pattern, another service URL. Our own images stay small (no CUDA). Trade-off: no speaker embeddings from the service, so voiceprint suggestions would need a separate service later. |
+| D25 | Service split | Separate containers that talk over the network; use community images where they exist. **Postgres:** official image (or any external Postgres: set `DATABASE_URL` in `.env`). **Transcription:** a community WhisperX HTTP service (first candidate: `onerahmet/openai-whisper-asr-webservice` GPU image with `ASR_ENGINE=whisperx`), pinned to a tested version, reached through a swappable connector. **LLM:** any OpenAI-compatible endpoint. **TTS (later, podcast engine):** same pattern, another service URL. Our own images stay small (no CUDA). Trade-off: no speaker embeddings from the service, so voiceprint suggestions would need a separate service later. |
+| D26 | Network isolation | Independent compose stacks (`db`, `app`, `asr`) joined only by Docker networks. Only the initiating side (app) has URLs. Passive services (Postgres, WhisperX) sit on internal networks with no internet, reachable only by their partners, and run an egress guard (in-container firewall: replies allowed, new outbound connections dropped, fails closed). Details: [NETWORK.md](NETWORK.md). |
 
 ## Components
 
-```
-Browser
-  getUserMedia({deviceId, echoCancellation:false, noiseSuppression:false, autoGainControl:false})
-  MediaRecorder(timeslice ≈10s) → PUT chunk n  (retry until ack)
-  Wake Lock (keeps screen on), pause/resume
-        │ HTTPS (Caddy, wildcard cert)
-        ▼
-api  (FastAPI, Jinja2 + htmx + small vanilla JS recorder)
-  auth, recordings, chunk receiver, transcript/insight/export endpoints, admin panel
-        │
-        ▼
-Postgres  (data + job queue via SELECT … FOR UPDATE SKIP LOCKED — no Redis)
-        │
-        ▼
-worker  (CUDA image, WhisperX + pyannote)        llm-worker (same codebase, no GPU)
-  ffmpeg → 16 kHz mono WAV                          calls OpenAI-compatible endpoint
-  transcribe → align → diarize                      templates, map-reduce for long text,
-  segments + words + speaker embeddings → DB        title/tags/meeting type, change-check
-        │
-        ▼
-/data volume: audio/{user_id}/{recording_id}/  (chunks → original.{webm|mp4} after finalize)
-```
+Diagrams: [DIAGRAMS.md](DIAGRAMS.md). Stacks, networks and who may talk to
+whom: [NETWORK.md](NETWORK.md). In short:
+
+- **Browser:** `getUserMedia({deviceId, echoCancellation:false,
+  noiseSuppression:false, autoGainControl:false})`, `MediaRecorder` (timeslice
+  ≈10 s) → `PUT` chunk n, retried until acked. Wake Lock keeps the screen on.
+  Pause/resume.
+- **app stack** (ours, small images, the only stack with URLs):
+  - **caddy:** TLS (wildcard cert), the only published ports.
+  - **api:** FastAPI + Jinja2 + a small vanilla-JS recorder. Auth, recordings,
+    chunk receiver, transcript/insight/export endpoints, admin panel.
+  - **worker-asr:** claims transcription jobs; ffmpeg → 16 kHz mono (D22);
+    sends audio to the WhisperX service; stores segments and words.
+  - **worker-llm:** claims insight jobs; calls the OpenAI-compatible LLM
+    (templates, map-reduce for long text, title/tags/meeting type, change-check).
+- **db stack:** official Postgres + egress guard. Data + job queue
+  (`SELECT … FOR UPDATE SKIP LOCKED`, no Redis).
+- **asr stack (M3):** community WhisperX service + egress guard (D25).
+- **Audio:** a volume, `audio/{user_id}/{recording_id}/` (chunks →
+  `original.{webm|mp4}` after finalize). Never stored in Postgres.
 
 ### Recording / upload protocol
 

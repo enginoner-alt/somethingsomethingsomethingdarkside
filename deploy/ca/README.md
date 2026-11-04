@@ -6,7 +6,7 @@ LLM endpoint) uses a certificate from an **internal or self-signed CA**.
 Drop the CA certificate here as a `.pem` or `.crt` file (PEM format, the one
 that starts with `-----BEGIN CERTIFICATE-----`) and restart:
 
-    docker compose up -d
+    ./darkside up
 
 Public CAs (Let's Encrypt, DigiCert, Sectigo, ...) are trusted already. Put
 nothing here for them.

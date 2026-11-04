@@ -107,7 +107,7 @@ containers fail with `exec ... no such file or directory`.
 ## 6. Configure and start
 
 Follow **Run it** in the [README](../README.md): `.env`, certificates, and
-`docker compose up -d --build`.
+`./darkside up --build`.
 
 Your wildcard cert files are probably on the Windows side. Copy them in from
 there (Windows drives are under `/mnt/c`):
@@ -170,7 +170,7 @@ login page with a valid certificate.
   stop. Set "When plugged in, put my device to sleep" to **Never** while testing.
 - **Check that the app sees real client IPs.** Login throttling counts
   failures per client IP. After a few wrong passwords, check what was recorded:
-  `docker compose exec postgres psql -U darkside -c "select ip, count(*) from login_failures group by ip"`.
+  `./darkside db exec postgres psql -U darkside -c "select ip, count(*) from login_failures group by ip"`.
   If every device shows the *same* address (possible with Docker Desktop or
   some WSL networking setups), the per-IP limit (20 failures in 15 minutes)
   applies to everyone at once. That's fine for a POC, but tell me and I'll
@@ -253,5 +253,5 @@ Hyper-V rule in this mode.
 
 Nothing in the repo is WSL-specific. On the production Linux server, follow the
 README directly. Copy `.env` and `deploy/certs/` over. Move data by dumping and
-restoring Postgres (`docker compose exec postgres pg_dump ...`), and from M1 on
+restoring Postgres (`./darkside db exec postgres pg_dump ...`), and from M1 on
 also copy the audio volume.

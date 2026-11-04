@@ -1,0 +1,89 @@
+# App stack: ours. The only stack that *starts* connections, so it holds the
+# URLs of everything it talks to (DATABASE_URL, later the WhisperX/LLM/TTS URLs).
+#
+# Networks (created by ./darkside):
+#   darkside-edge  caddy <-> api; caddy publishes 80/443. Normal bridge.
+#   darkside-db    internal; api + workers -> postgres.
+#   darkside-asr   internal; workers -> WhisperX service (M3).
+#   darkside-out   normal bridge: outbound for api (IdP) and workers (LLM, TTS).
+name: darkside-app
+
+x-server: &server
+  build: ../../server
+  image: darkside-server:local
+  restart: unless-stopped
+  env_file: ../../.env
+  volumes:
+    # Optional internal/self-signed CA certificates the app should trust
+    # (e.g. for your IdP). See deploy/ca/README.md.
+    - ../ca:/etc/darkside/ca:ro
+
+x-db-url: &db-url
+  # Default: the postgres container of the db stack on the shared network.
+  # Set DATABASE_URL in .env to use a Postgres server elsewhere.
+  DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://darkside:${POSTGRES_PASSWORD}@postgres:5432/darkside}
+
+services:
+  api:
+    <<: *server
+    command: ["api"]
+    environment:
+      <<: *db-url
+    networks: [edge, db, out]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+
+  # Transcription jobs. A small client of the WhisperX service from M3 on (D25).
+  worker-asr:
+    <<: *server
+    command: ["worker", "--queue", "gpu"]
+    environment:
+      <<: *db-url
+      WORKER_ID: worker-asr-1
+    networks: [db, asr]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Insight jobs: calls the LLM server (M4).
+  worker-llm:
+    <<: *server
+    command: ["worker", "--queue", "llm"]
+    environment:
+      <<: *db-url
+      WORKER_ID: worker-llm-1
+    networks: [db, out]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      CADDY_TLS: ${CADDY_TLS:-/certs/fullchain.pem /certs/privkey.pem}
+    volumes:
+      - ../Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../certs:/certs:ro
+      - caddy_data:/data
+    networks: [edge]
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  edge: { name: darkside-edge, external: true }
+  db: { name: darkside-db, external: true }
+  asr: { name: darkside-asr, external: true }
+  out: { name: darkside-out, external: true }
+
+volumes:
+  caddy_data:
+    name: darkside_caddy_data

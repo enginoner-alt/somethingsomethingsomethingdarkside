@@ -35,11 +35,34 @@ jobs:
       - run: ruff format --check .
       - run: pytest -q
 
-  docker:
+  stack:
+    # Builds the real images, starts the db + app stacks exactly like
+    # ./darkside up does on a laptop, and verifies the network isolation rules.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate compose file
-        run: cp .env.example .env && docker compose config --quiet
-      - name: Build image
-        run: docker build -t darkside-server:ci server
+      - name: Validate compose files
+        run: |
+          cp .env.example .env
+          for s in db app asr; do
+            docker compose -p "ci-$s" --env-file .env -f "deploy/$s/compose.yml" config --quiet
+          done
+      - name: Configure for CI
+        run: |
+          sed -i "s/^SITE_ADDRESS=.*/SITE_ADDRESS=localhost/; s#^CADDY_TLS=.*#CADDY_TLS=internal#" .env
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
+          sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
+          sed -i "s/^BOOTSTRAP_ADMIN_PASSWORD=.*/BOOTSTRAP_ADMIN_PASSWORD=ci-admin-password/" .env
+      - name: Build images and start stacks
+        run: |
+          ./darkside db build
+          ./darkside up --build
+      - name: Isolation check
+        run: ./darkside check
+      - name: Login through caddy
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/login)
+          test "$code" = 200 || { echo "login page returned $code"; exit 1; }
+      - name: Logs on failure
+        if: failure()
+        run: ./darkside logs || true

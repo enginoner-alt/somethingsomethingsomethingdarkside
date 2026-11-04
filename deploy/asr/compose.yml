@@ -1,0 +1,15 @@
+# Transcription stack: passive, community WhisperX service (D25). Arrives in M3.
+# It never starts a connection, so it has no URLs. Only the asr worker can
+# reach it, on the internal darkside-asr network; it has no internet access.
+#
+# Models are downloaded once into the models volume (M3 adds the one-off
+# download step that runs with internet access), then the service runs
+# offline. The image will be pinned to a tested version in M3.
+name: darkside-asr
+
+services: {}
+
+networks:
+  asr:
+    name: darkside-asr
+    external: true

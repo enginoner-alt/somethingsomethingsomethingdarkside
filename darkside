@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Run the Darkside stacks. Each stack is an independent Docker Compose project
+# (deploy/<stack>/compose.yml); this script just creates the shared networks
+# and starts/stops them in the right order on one machine.
+#
+#   ./darkside up [--build]      create networks, start db, then app
+#   ./darkside down              stop app, then db (data is kept)
+#   ./darkside ps                status of all stacks
+#   ./darkside logs [service…]   follow logs (all, or e.g. api postgres)
+#   ./darkside check             verify the network isolation rules
+#   ./darkside <stack> <args…>   any docker compose command on one stack,
+#                                e.g. ./darkside db exec postgres psql -U darkside
+#
+# Stacks: db (postgres), app (caddy, api, workers), asr (WhisperX, from M3).
+set -euo pipefail
+cd "$(dirname "$0")"
+
+STACKS_UP=(db app)        # asr joins in M3
+ENV_FILE=.env
+
+[[ -f $ENV_FILE ]] || { echo "Missing .env: cp .env.example .env and fill it in." >&2; exit 1; }
+
+compose() { # compose <stack> <args...>
+  local stack=$1; shift
+  docker compose -p "darkside-$stack" --env-file "$ENV_FILE" -f "deploy/$stack/compose.yml" "$@"
+}
+
+ensure_networks() {
+  # name            internal?  purpose
+  local nets=(
+    "darkside-edge  no   caddy <-> api"
+    "darkside-db    yes  api, workers -> postgres (no internet)"
+    "darkside-asr   yes  asr worker -> WhisperX (no internet)"
+    "darkside-out   no   outbound for api (IdP) and workers (LLM, TTS)"
+  )
+  for line in "${nets[@]}"; do
+    read -r name internal _ <<<"$line"
+    if ! docker network inspect "$name" >/dev/null 2>&1; then
+      if [[ $internal == yes ]]; then
+        docker network create --internal "$name" >/dev/null
+      else
+        docker network create "$name" >/dev/null
+      fi
+      echo "created network $name (internal: $internal)"
+    fi
+  done
+}
+
+stack_of() { # which stack runs this service
+  case $1 in
+    postgres) echo db ;;
+    whisperx|asr) echo asr ;;
+    *) echo app ;;
+  esac
+}
+
+cmd=${1:-help}
+shift || true
+
+case $cmd in
+  up)
+    ensure_networks
+    compose db up -d --wait
+    compose app up -d --wait "$@"
+    compose app ps
+    ;;
+  down)
+    for ((i=${#STACKS_UP[@]}-1; i>=0; i--)); do compose "${STACKS_UP[i]}" down "$@"; done
+    ;;
+  ps)
+    for s in "${STACKS_UP[@]}"; do compose "$s" ps; done
+    ;;
+  logs)
+    if [[ $# -eq 0 ]]; then
+      for s in "${STACKS_UP[@]}"; do compose "$s" logs --tail 50; done
+    else
+      for svc in "$@"; do compose "$(stack_of "$svc")" logs -f --tail 100 "$svc" & done
+      wait
+    fi
+    ;;
+  check)
+    exec "$(dirname "$0")/deploy/check-isolation.sh"
+    ;;
+  db|app|asr)
+    compose "$cmd" "$@"
+    ;;
+  help|-h|--help)
+    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    echo "unknown command: $cmd (try ./darkside help)" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,41 @@
+# Database stack: passive. It never starts a connection, so it has no URLs.
+#
+# Networks (created by ./darkside, shared by name with the app stack):
+#   darkside-db  internal: only api + workers can reach postgres; postgres
+#                can't reach anything else, internet included.
+# No ports are published on the host. To run this stack on its own machine,
+# see "Splitting stacks across machines" in docs/NETWORK.md.
+name: darkside-db
+
+services:
+  postgres:
+    # Official postgres:16-alpine + egress guard: postgres can answer its
+    # partners but can't open any connection itself (see deploy/guard/).
+    build:
+      context: ..
+      dockerfile: db/Dockerfile
+    image: darkside-postgres:16-alpine-guarded
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]   # used only by the guard at start, see deploy/guard/
+    environment:
+      POSTGRES_USER: darkside
+      POSTGRES_DB: darkside
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [db]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darkside -d darkside"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+networks:
+  db:
+    name: darkside-db
+    external: true
+
+volumes:
+  pgdata:
+    # Same volume name as before the stack split, so existing data is kept.
+    name: darkside_pgdata

@@ -9,6 +9,7 @@ browser, transcribe and diarize with WhisperX on your own GPU, and get insights
 from your own local LLM. Your server, your models, your data.
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design and decisions log
+- [docs/NETWORK.md](docs/NETWORK.md): stacks, networks, who may talk to whom, egress guard
 - [docs/DIAGRAMS.md](docs/DIAGRAMS.md): architecture diagrams (system, deployment, recording flow, SSO, login safety, jobs)
 - [docs/MILESTONES.md](docs/MILESTONES.md): milestones and acceptance criteria
 - [docs/WINDOWS-WSL.md](docs/WINDOWS-WSL.md): running the POC on Windows via WSL2 (production uses the Linux instructions below)
@@ -18,7 +19,8 @@ via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record an
 
 ## Requirements
 
-- Docker with the Compose plugin (`docker compose version`).
+- Docker with the Compose plugin (`docker compose version`), and `bash`
+  (the `./darkside` helper script).
 - A hostname for the app that your wildcard certificate covers (e.g.
   `rec.example.com`), with DNS (or a hosts-file entry) pointing it at this machine.
 - Ports 80 and 443 free on this machine.
@@ -57,7 +59,15 @@ via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record an
 3. Start:
 
    ```bash
-   docker compose up -d --build
+   ./darkside up --build
+   ```
+
+   This starts two independent stacks: `db` (Postgres) and `app` (Caddy,
+   API, workers). See [docs/NETWORK.md](docs/NETWORK.md) for who may talk to
+   whom, then check it:
+
+   ```bash
+   ./darkside check
    ```
 
 4. Open `https://<SITE_ADDRESS>` and log in as `admin` with the password you set.
@@ -111,7 +121,7 @@ For trying the app as a normal (non-admin) user on your home machine.
 2. Apply it:
 
    ```bash
-   docker compose up -d
+   ./darkside up
    ```
 
 3. Log in as `test` with that password. Use a private window if you're
@@ -135,7 +145,7 @@ The test account is a local password account. With
 2. Log in as admin. You land on the Recordings placeholder page.
 3. Open **Admin → Jobs** and click **Run test job on "gpu"**, then **"llm"**.
    Within a few seconds both should show **done**, with
-   `"worker": "worker-gpu-1"` / `"worker-llm-1"` in the result.
+   `"worker": "worker-asr-1"` / `"worker-llm-1"` in the result.
 4. Create a second (non-admin) user, log in as that user in a private window,
    and confirm `/admin` returns 403.
 5. Switch the language to Türkçe. The UI is translated and the choice persists
@@ -181,7 +191,7 @@ There's deliberately no "match the CN inside any DN" shortcut. In AD a CN is
 only unique within its OU, so another OU could hold a different group with
 the same CN. Set `OIDC_GROUPS_CLAIM` to the claim your provider uses
 (`groups`, `memberOf`, `roles` for Entra App Roles, …). Every SSO login logs
-the groups it received (`docker compose logs api | grep "OIDC login"`), so
+the groups it received (`./darkside app logs api | grep "OIDC login"`), so
 you can copy the exact value from there.
 
 **Client secret.** `OIDC_TOKEN_AUTH_METHOD=auto` (default) reads the
@@ -209,23 +219,38 @@ AD-style `memberOf` DNs and `client_secret_post`) and what to change for AD:
 
 ## Operations
 
+**Upgrading from the single `docker-compose.yml` version:** stop the old
+containers first. Run this *before* updating the code (it needs the old file),
+or with `-p darkside` afterwards:
+
 ```bash
-docker compose ps
+docker compose -p darkside down
+```
+
+Then `./darkside up --build`. Your data is kept: the database volume has the
+same name (`darkside_pgdata`).
+
+
+```bash
+./darkside ps
 ```
 
 ```bash
-docker compose logs -f api worker-gpu worker-llm
+./darkside logs api worker-asr worker-llm postgres
 ```
 
 ```bash
-docker compose down
+./darkside down
 ```
 
-Data lives in the `pgdata` Docker volume. `docker compose down` keeps it;
-`docker compose down -v` **deletes it**.
+Any Docker Compose command works on a single stack too, e.g.
+`./darkside db exec postgres psql -U darkside` or `./darkside app restart api`.
+
+Data lives in the `darkside_pgdata` Docker volume. `./darkside down` keeps
+it. `./darkside db down -v` **deletes it**.
 
 **Forgot the admin password?** Set a new `BOOTSTRAP_ADMIN_PASSWORD`, set
-`BOOTSTRAP_ADMIN_RESET=true`, then `docker compose up -d api`. Set it back to
+`BOOTSTRAP_ADMIN_RESET=true`, then `./darkside app up -d api`. Set it back to
 `false` afterwards.
 
 ## Development
@@ -254,7 +279,12 @@ Copy `server/app/locales/en.json` to `xx.json`, translate the values, and set
 ## Layout
 
 ```
-docker-compose.yml       caddy, api, postgres, worker-gpu, worker-llm
+darkside                 helper: create networks, start/stop/check the stacks
+deploy/app/compose.yml   app stack: caddy, api, worker-asr, worker-llm
+deploy/db/               db stack: official Postgres + egress guard
+deploy/asr/              transcription stack (WhisperX, from M3)
+deploy/guard/            egress guard for passive services
+deploy/check-isolation.sh  ./darkside check: verifies the network rules
 deploy/Caddyfile         TLS + security headers (mic allowed, camera/geo off)
 server/app/              FastAPI app, job queue, worker, templates, locales
 server/alembic/          database migrations (applied on api start)
