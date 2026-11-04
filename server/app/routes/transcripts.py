@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import i18n, insights, pipeline, recordings
+from app import errors, i18n, insights, pipeline, recordings
 from app.db import get_db
 from app.models import Insight, Recording, Segment, Speaker, Transcript, User
 from app.recordings import RecordingError
@@ -37,7 +37,7 @@ def transcript_dict(db: Session, rec: Recording) -> dict:
         "status": tr.status,
         "language": tr.language,
         "channel": tr.channel,
-        "error": tr.error,
+        "error": errors.decode(tr.error),
         "speakers": [{"label": k, "name": v} for k, v in sorted(names.items())],
         "segments": [
             {"start": s.start, "end": s.end, "speaker": s.speaker, "text": s.text} for s in segs
@@ -54,7 +54,7 @@ def insight_dict(ins: Insight) -> dict:
         "answer": ins.answer,
         "data": ins.data,
         "model": ins.model,
-        "error": ins.error,
+        "error": errors.decode(ins.error),
         "created_at": ins.created_at.isoformat() if ins.created_at else None,
     }
 
@@ -84,12 +84,7 @@ def recording_page(
         rec = owned(db, user, rec_id)
     except RecordingError:
         return render(request, "not_found.html", user, status_code=404)
-    locale = resolve_locale(request, user)
-    js = {
-        k: i18n.translate(locale, k)
-        for k in i18n.load_locales()["en"]
-        if k.startswith(("tx.", "rec."))
-    }
+    js = i18n.strings(resolve_locale(request, user), "tx.", "rec.", "err.")
     return render(request, "recording.html", user, rec=as_dict(rec), js_strings=js)
 
 

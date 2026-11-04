@@ -1,113 +1,115 @@
 {% extends "base.html" %}
 {% block title %}{{ t("dir.title") }} · {{ app_name }}{% endblock %}
 {% block content %}
-<p><a href="/admin">← {{ t("admin.title") }}</a></p>
-<h1>{{ t("dir.title") }}</h1>
+{% include "_admin_head.html" %}
 {% if saved %}<p class="notice" role="status">{{ t("dir.saved") }}</p>{% endif %}
 {% if error %}<p class="error" role="alert">{{ t("dir.error." ~ error) }}</p>{% endif %}
 
-<section class="card">
-  <h2>{{ t("dir.status") }}</h2>
-  <div class="table-wrap"><table>
-    <tr><th>{{ t("dir.method") }}</th><th>{{ t("dir.configured") }}</th><th>{{ t("dir.working") }}</th></tr>
-    <tr><td>{{ t("dir.sso") }}</td>
-      <td>{{ t("common.yes") if policy.oidc_configured else t("common.no") }}</td>
-      <td>{% if policy.oidc_configured %}<span class="badge {{ 'done' if policy.oidc_ok else 'failed' }}">{{ t("common.yes") if policy.oidc_ok else t("common.no") }}</span>{% else %}—{% endif %}</td></tr>
-    <tr><td>{{ t("dir.ad") }}</td>
-      <td>{{ t("common.yes") if policy.ldap_configured else t("common.no") }}</td>
-      <td>{% if policy.ldap_configured %}<span class="badge {{ 'done' if policy.ldap_ok else 'failed' }}">{{ t("common.yes") if policy.ldap_ok else t("common.no") }}</span>{% else %}—{% endif %}</td></tr>
-  </table></div>
-  <p><strong>{{ t("dir.now") }}</strong>
-    {% if policy.oidc_configured and policy.oidc_ok and not policy.ad_passwords_allowed %}{{ t("dir.now_sso") }}
-    {% elif policy.ad_passwords_allowed and policy.oidc_configured and policy.oidc_ok %}{{ t("dir.now_both_ad_preferred") }}
-    {% elif policy.ad_passwords_allowed %}{{ t("dir.now_ad") }}
-    {% else %}{{ t("dir.now_local_only") }}{% endif %}
-  </p>
-  <p class="muted">{{ t("dir.rule") }}</p>
-  <div class="row">
-    <form method="post" action="/admin/directory/verify-sso" class="inline">
+<div class="form-grid">
+  <div><h2>{{ t("dir.status") }}</h2><p>{{ t("dir.rule") }}</p></div>
+  <div class="stack">
+    <div class="table-wrap"><table>
+      <thead><tr><th>{{ t("dir.method") }}</th><th>{{ t("dir.configured") }}</th><th>{{ t("dir.working") }}</th></tr></thead>
+      <tr><td>{{ t("dir.sso") }}</td>
+        <td>{{ t("common.yes") if policy.oidc_configured else t("common.no") }}</td>
+        <td>{% if policy.oidc_configured %}<span class="badge {{ 'done' if policy.oidc_ok else 'failed' }}">{{ t("common.yes") if policy.oidc_ok else t("common.no") }}</span>{% else %}—{% endif %}</td></tr>
+      <tr><td>{{ t("dir.ad") }}</td>
+        <td>{{ t("common.yes") if policy.ldap_configured else t("common.no") }}</td>
+        <td>{% if policy.ldap_configured %}<span class="badge {{ 'done' if policy.ldap_ok else 'failed' }}">{{ t("common.yes") if policy.ldap_ok else t("common.no") }}</span>{% else %}—{% endif %}</td></tr>
+    </table></div>
+    <p class="notice"><strong>{{ t("dir.now") }}</strong>
+      {% if policy.oidc_configured and policy.oidc_ok and not policy.ad_passwords_allowed %}{{ t("dir.now_sso") }}
+      {% elif policy.ad_passwords_allowed and policy.oidc_configured and policy.oidc_ok %}{{ t("dir.now_both_ad_preferred") }}
+      {% elif policy.ad_passwords_allowed %}{{ t("dir.now_ad") }}
+      {% else %}{{ t("dir.now_local_only") }}{% endif %}
+    </p>
+    <form method="post" action="/admin/directory/verify-sso">
       <input type="hidden" name="csrf" value="{{ csrf_token }}">
       <button>{{ t("dir.verify_sso") }}</button>
     </form>
   </div>
-</section>
+</div>
 
-{% if steps %}
-<section class="card" id="verify">
-  <h2>{{ t("dir.verify_result", what=verify_title) }}</h2>
-  <div class="table-wrap"><table>
-    {% for st in steps %}
-    <tr><td><span class="badge {{ 'done' if st.ok else 'failed' }}">{{ "OK" if st.ok else "FAIL" }}</span></td>
-        <td>{{ st.label }}</td><td class="mono">{{ st.detail }}</td></tr>
-    {% endfor %}
-  </table></div>
-</section>
-{% endif %}
+{% include "_steps.html" %}
 
-<section class="card">
-  <h2>{{ t("dir.ad_settings") }}</h2>
-  {% if problems %}<p class="error">{{ t("dir.problems") }} {{ problems | join("; ") }}</p>{% endif %}
-  <form method="post" action="/admin/directory" class="stack">
-    <input type="hidden" name="csrf" value="{{ csrf_token }}">
-    <label class="check"><input type="checkbox" name="enabled" {% if d.enabled %}checked{% endif %}> {{ t("dir.enabled") }}</label>
-    <label>{{ t("dir.servers") }}
-      <textarea name="servers" rows="2" placeholder="ldaps://dc01.corp.local:636">{{ d.servers | join("\n") }}</textarea>
-      <span class="muted">{{ t("dir.servers_hint") }}</span>
-    </label>
-    <label class="check"><input type="checkbox" name="start_tls" {% if d.start_tls %}checked{% endif %}> {{ t("dir.start_tls") }}</label>
-    <label>{{ t("dir.bind_dn") }}
-      <input name="bind_dn" value="{{ d.bind_dn }}" placeholder="CN=svc-darkside,OU=Service Accounts,DC=corp,DC=local">
-    </label>
-    <div>
-      <strong>{{ t("dir.bind_password") }}</strong>
-      {% if secret_set %}
-        <span class="badge done">{{ t("dir.secret_set") }}</span>
-        <span class="muted">{{ t("dir.fingerprint") }} <code>{{ secret_fp }}</code></span>
-      {% else %}
-        <span class="badge failed">{{ t("dir.secret_missing") }}</span>
-      {% endif %}
-      <p class="muted">{{ t("dir.secret_hint") }}</p>
+<form method="post" action="/admin/directory">
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
+  <div class="form-grid">
+    <div><h2>{{ t("dir.ad_settings") }}</h2><p>{{ t("dir.ad_settings_hint") }}</p></div>
+    <div class="stack">
+      {% if problems %}<p class="error">{{ t("dir.problems") }}
+        {% for p in problems %}{{ t("dir.problem." ~ p) }}{% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+      <label class="check"><input type="checkbox" name="enabled" {% if d.enabled %}checked{% endif %}> {{ t("dir.enabled") }}</label>
+      <label>{{ t("dir.servers") }}
+        <textarea name="servers" rows="2" placeholder="ldaps://dc01.corp.local:636">{{ d.servers | join("\n") }}</textarea>
+        <span class="hint small">{{ t("dir.servers_hint") }}</span>
+      </label>
+      <label class="check"><input type="checkbox" name="start_tls" {% if d.start_tls %}checked{% endif %}> {{ t("dir.start_tls") }}</label>
     </div>
-    <label>{{ t("dir.search_base") }}
-      <input name="search_base" value="{{ d.search_base }}" placeholder="DC=corp,DC=local">
-    </label>
-    <label>{{ t("dir.required_group") }}
-      <input name="required_group" value="{{ d.required_group }}" placeholder="darkside-users">
-    </label>
-    <label>{{ t("dir.admin_group") }}
-      <input name="admin_group" value="{{ d.admin_group }}" placeholder="darkside-admins">
-      <span class="muted">{{ t("dir.group_hint") }}</span>
-    </label>
-    <label class="check"><input type="checkbox" name="nested_groups" {% if d.nested_groups %}checked{% endif %}> {{ t("dir.nested") }}</label>
-    <label>{{ t("dir.preferred") }}
-      <select name="preferred_method">
-        <option value="oidc" {% if login.preferred_method == "oidc" %}selected{% endif %}>{{ t("dir.sso") }}</option>
-        <option value="ldap" {% if login.preferred_method == "ldap" %}selected{% endif %}>{{ t("dir.ad") }}</option>
-      </select>
-      <span class="muted">{{ t("dir.preferred_hint") }}</span>
-    </label>
-    <details>
-      <summary class="muted">{{ t("dir.advanced") }}</summary>
-      <div class="stack">
-        <label>{{ t("dir.username_attribute") }}<input name="username_attribute" value="{{ d.username_attribute }}"></label>
-        <label>{{ t("dir.user_filter") }}<input name="user_filter" value="{{ d.user_filter }}"></label>
-        <label>{{ t("dir.group_filter") }}<input name="group_filter" value="{{ d.group_filter }}"></label>
-        <label>{{ t("dir.group_name_attribute") }}<input name="group_name_attribute" value="{{ d.group_name_attribute }}"></label>
-        <label>{{ t("dir.timeout") }}<input name="timeout_seconds" type="number" min="1" max="30" value="{{ d.timeout_seconds }}"></label>
+  </div>
+  <div class="form-grid">
+    <div><h2>{{ t("dir.account") }}</h2><p>{{ t("dir.secret_hint") }}</p></div>
+    <div class="stack">
+      <label>{{ t("dir.bind_dn") }}
+        <input name="bind_dn" value="{{ d.bind_dn }}" placeholder="CN=svc-darkside,OU=Service Accounts,DC=corp,DC=local">
+      </label>
+      <div class="secret">
+        <strong>{{ t("dir.bind_password") }}</strong>
+        {% if secret_set %}
+          <span class="badge done">{{ t("dir.secret_set") }}</span>
+          <span class="muted">{{ t("dir.fingerprint") }} <code>{{ secret_fp }}</code></span>
+        {% else %}
+          <span class="badge failed">{{ t("dir.secret_missing") }}</span>
+        {% endif %}
       </div>
-    </details>
-    <button class="primary">{{ t("dir.save") }}</button>
-  </form>
-</section>
+      <label>{{ t("dir.search_base") }}
+        <input name="search_base" value="{{ d.search_base }}" placeholder="DC=corp,DC=local">
+      </label>
+    </div>
+  </div>
+  <div class="form-grid">
+    <div><h2>{{ t("dir.access") }}</h2><p>{{ t("dir.group_hint") }}</p></div>
+    <div class="stack">
+      <div class="fields">
+        <label>{{ t("dir.required_group") }}
+          <input name="required_group" value="{{ d.required_group }}" placeholder="darkside-users">
+        </label>
+        <label>{{ t("dir.admin_group") }}
+          <input name="admin_group" value="{{ d.admin_group }}" placeholder="darkside-admins">
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" name="nested_groups" {% if d.nested_groups %}checked{% endif %}> {{ t("dir.nested") }}</label>
+      <label>{{ t("dir.preferred") }}
+        <select name="preferred_method">
+          <option value="oidc" {% if login.preferred_method == "oidc" %}selected{% endif %}>{{ t("dir.sso") }}</option>
+          <option value="ldap" {% if login.preferred_method == "ldap" %}selected{% endif %}>{{ t("dir.ad") }}</option>
+        </select>
+        <span class="hint small">{{ t("dir.preferred_hint") }}</span>
+      </label>
+      <details>
+        <summary>{{ t("dir.advanced") }}</summary>
+        <div class="fields">
+          <label>{{ t("dir.username_attribute") }}<input name="username_attribute" value="{{ d.username_attribute }}"></label>
+          <label>{{ t("dir.group_name_attribute") }}<input name="group_name_attribute" value="{{ d.group_name_attribute }}"></label>
+          <label>{{ t("dir.user_filter") }}<input name="user_filter" value="{{ d.user_filter }}"></label>
+          <label>{{ t("dir.group_filter") }}<input name="group_filter" value="{{ d.group_filter }}"></label>
+          <label>{{ t("dir.timeout") }}<input name="timeout_seconds" type="number" min="1" max="30" value="{{ d.timeout_seconds }}"></label>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div class="actions"><button class="primary">{{ t("dir.save") }}</button></div>
+</form>
 
-<section class="card">
-  <h2>{{ t("dir.verify_ad") }}</h2>
-  <p class="muted">{{ t("dir.verify_ad_hint") }}</p>
-  <form method="post" action="/admin/directory/verify-ad" class="row">
+<div class="form-grid" style="margin-top: 24px">
+  <div><h2>{{ t("dir.verify_ad") }}</h2><p>{{ t("dir.verify_ad_hint") }}</p></div>
+  <form method="post" action="/admin/directory/verify-ad" class="stack">
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
-    <input name="test_username" placeholder="{{ t('dir.test_username') }}" autocomplete="off">
-    <input name="test_password" type="password" placeholder="{{ t('dir.test_password') }}" autocomplete="new-password">
-    <button>{{ t("dir.verify_ad") }}</button>
+    <div class="fields">
+      <label>{{ t("dir.test_username") }}<input name="test_username" autocomplete="off"></label>
+      <label>{{ t("dir.test_password") }}<input name="test_password" type="password" autocomplete="new-password"></label>
+    </div>
+    <div><button>{{ t("dir.verify_ad") }}</button></div>
   </form>
-</section>
+</div>
 {% endblock %}

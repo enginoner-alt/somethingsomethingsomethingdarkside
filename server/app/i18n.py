@@ -32,6 +32,11 @@ def translate(locale: str, key: str, **params: object) -> str:
     return text.format(**params) if params else text
 
 
+def strings(locale: str, *prefixes: str) -> dict[str, str]:
+    """The keys starting with any of `prefixes`, for a page's JavaScript."""
+    return {k: translate(locale, k) for k in load_locales()[FALLBACK] if k.startswith(prefixes)}
+
+
 def negotiate(accept_language: str | None, default: str) -> str:
     """Pick the best available locale from an Accept-Language header."""
     available = load_locales()

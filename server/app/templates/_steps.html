@@ -1,0 +1,13 @@
+{% if steps %}
+<section class="panel" id="verify">
+  <h2>{{ t("dir.verify_result", what=verify_title) }}</h2>
+  <div class="table-wrap"><table class="steps">
+    {% for st in steps %}
+    <tr><td><span class="badge {{ 'done' if st.ok else 'failed' }}">{{ t("step.ok") if st.ok else t("step.fail") }}</span></td>
+        <td>{{ t("step." ~ st.label, **st.params) }}</td>
+        <td>{% if st.note %}{{ t("step.note." ~ st.note, **st.params) }}{% if st.detail %}<br>{% endif %}{% endif %}
+            {% if st.detail %}<span class="mono">{{ st.detail }}</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+</section>
+{% endif %}

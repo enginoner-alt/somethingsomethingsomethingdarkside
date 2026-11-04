@@ -81,7 +81,7 @@ def ts(seconds: float | None) -> str:
 def transcript_lines(db: Session, rec: Recording) -> tuple[list[str], str]:
     tr = db.scalar(select(Transcript).where(Transcript.recording_id == rec.id))
     if tr is None or tr.status != "done":
-        raise services.ServiceError("the recording has no finished transcript yet")
+        raise services.ServiceError("no_transcript")
     names = {
         sp.label: sp.name
         for sp in db.scalars(select(Speaker).where(Speaker.recording_id == rec.id))

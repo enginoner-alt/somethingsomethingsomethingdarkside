@@ -123,7 +123,7 @@ def test_bad_channel_is_reported_not_crashed(alice, db, configured):
     alice.post(f"/api/recordings/{rec['id']}/transcribe", json={"channel": "9"})
     drain(db, "gpu")
     tr = db.query(Transcript).one()
-    assert tr.status == "failed" and "has 4" in tr.error
+    assert tr.status == "failed" and "no_such_channel" in tr.error
 
 
 def test_asr_unreachable_is_reported(alice, db, configured):
@@ -131,7 +131,7 @@ def test_asr_unreachable_is_reported(alice, db, configured):
     upload(alice)
     drain(db, "gpu")
     tr = db.query(Transcript).one()
-    assert tr.status == "failed" and "unreachable" in tr.error
+    assert tr.status == "failed" and "asr_unreachable" in tr.error
 
 
 def ready(alice, db):
@@ -234,7 +234,7 @@ def test_llm_key_is_sent_and_wrong_key_fails(alice, db, configured, secrets_dir)
     alice.post(f"/api/recordings/{rec['id']}/insights", json={"kind": "summary"})
     drain(db, "llm")
     ins = db.query(Insight).one()
-    assert ins.status == "failed" and "401" in ins.error
+    assert ins.status == "failed" and "llm_http" in ins.error and "401" in ins.error
 
 
 def test_insight_needs_finished_transcript(alice, db, configured):
@@ -274,10 +274,10 @@ def test_verify_buttons_against_fakes(db, configured):
         asr_url="http://whisperx:9000", llm_base_url="http://llm:8000/v1", llm_model="fake-model"
     )
     asr = {st.label: st for st in services.verify_asr(s)}
-    assert asr["POST /asr"].ok and asr["Speaker parameters"].ok
+    assert asr["post_asr"].ok and asr["speaker_params"].ok
     llm = {st.label: st for st in services.verify_llm(s)}
-    assert llm["Models offered"].ok and "fake-model" in llm["Models offered"].detail
-    assert llm["Test question"].ok
+    assert llm["models_offered"].ok and "fake-model" in llm["models_offered"].detail
+    assert llm["test_question"].ok
 
 
 def test_mono_opus_browser_recording_also_works(alice, db, configured, tmp_path):
@@ -308,8 +308,9 @@ def test_admin_services_page_save_verify_and_prompts(client, admin, db, configur
     from app.settings_store import get_prompts, get_services
 
     login(client, "admin", "admin-password-123")
+    assert "Insight prompts" in client.get("/admin/prompts").text
     page = client.get("/admin/services").text
-    assert "Insight prompts" in page and "sk-test" not in page and "fingerprint" in page
+    assert "sk-test" not in page and "fingerprint" in page
     r = client.post(
         "/admin/services",
         data={

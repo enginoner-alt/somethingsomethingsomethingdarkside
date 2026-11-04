@@ -85,9 +85,9 @@ def test_pick_one_channel(four_channel, tmp_path, n):
 
 
 def test_bad_channel_choices(four_channel, tmp_path):
-    with pytest.raises(audio_prep.PrepError, match="has 4"):
+    with pytest.raises(audio_prep.PrepError, match="no_such_channel"):
         audio_prep.prepare(four_channel, tmp_path / "x.flac", channel="5")
-    with pytest.raises(audio_prep.PrepError, match="mix"):
+    with pytest.raises(audio_prep.PrepError, match="bad_channel"):
         audio_prep.prepare(four_channel, tmp_path / "x.flac", channel="left")
 
 

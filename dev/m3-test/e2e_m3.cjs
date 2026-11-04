@@ -28,6 +28,7 @@ const check = (ok, label, detail = "") => {
   check(page.url() === `${APP}/`, `${USER} logged in`);
 
   // Upload the 4-channel file through the page; auto-transcribe kicks in.
+  await page.click(".upload-box summary");
   await page.check("#consent");
   await page.setInputFiles("#upload-file", AUDIO);
   await page.click("#upload-form button");
@@ -49,19 +50,19 @@ const check = (ok, label, detail = "") => {
     subject: /Ofis taşınma planlaması/,
     action_items: /Ayse: send the moving checklist/,
     decisions: /Sign the office lease/,
-    speakers: /SPEAKER_00 → Ayşe[\s\S]*SPEAKER_01 → Mehmet/,
+    speakers: /Ayşe · SPEAKER_00[\s\S]*Mehmet · SPEAKER_01/,
   };
   for (const kind of Object.keys(want)) {
     await page.click(`#insight-buttons button[data-kind=${kind}]`);
-    await page.waitForSelector(`.rec-row[data-kind=${kind}][data-status=done], .rec-row[data-kind=${kind}][data-status=failed]`, { timeout: 30000 });
-    const text = await page.textContent(`.rec-row[data-kind=${kind}]`);
+    await page.waitForSelector(`.insight[data-kind=${kind}][data-status=done], .insight[data-kind=${kind}][data-status=failed]`, { timeout: 30000 });
+    const text = await page.textContent(`.insight[data-kind=${kind}]`);
     check(want[kind].test(text), `insight '${kind}' answered and saved`, text.slice(0, 160));
   }
   await page.waitForFunction(() => document.getElementById("rec-title").textContent.includes("Ofis"), null, { timeout: 10000 }).catch(() => {});
   check((await page.textContent("#rec-title")).includes("Ofis taşınma planlaması"), "meeting subject became the recording's title");
 
   // Apply the suggested names -> transcript shows them.
-  await page.click(".rec-row[data-kind=speakers] button:not(.link)");
+  await page.click(".insight[data-kind=speakers] button:not(.link)");
   await page.waitForFunction(() => [...document.querySelectorAll(".seg strong")].some((s) => s.textContent === "Ayşe"), null, { timeout: 10000 });
   const who = await page.$$eval(".seg strong", (s) => [...new Set(s.map((x) => x.textContent))]);
   check(who.includes("Ayşe") && who.includes("Mehmet"), `names applied in the transcript (${who.join(", ")})`);
@@ -69,14 +70,14 @@ const check = (ok, label, detail = "") => {
   // Free question.
   await page.fill("#ask-form input[name=question]", "Ne zaman imzalanacak?");
   await page.click("#ask-form button");
-  await page.waitForSelector(".rec-row[data-kind=question][data-status=done]", { timeout: 30000 });
-  const qa = await page.textContent(".rec-row[data-kind=question]");
+  await page.waitForSelector(".insight[data-kind=question][data-status=done]", { timeout: 30000 });
+  const qa = await page.textContent(".insight[data-kind=question]");
   check(/FAKE ANSWER to: Ne zaman imzalanacak\?/.test(qa), "free question answered and saved", qa.slice(0, 120));
 
   // Everything persisted: reload and it's all still there.
   await page.reload();
-  await page.waitForSelector(".rec-row[data-kind=question]");
-  const kinds = await page.$$eval("#insights .rec-row", (r) => r.map((x) => x.dataset.kind));
+  await page.waitForSelector(".insight[data-kind=question]");
+  const kinds = await page.$$eval("#insights .insight", (r) => r.map((x) => x.dataset.kind));
   check(["summary", "subject", "action_items", "decisions", "speakers", "question"].every((k) => kinds.includes(k)),
     `after reload all ${kinds.length} insights are still there (saved in the database)`);
 

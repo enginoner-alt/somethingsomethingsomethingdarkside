@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ t("rec.new") }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div id="recorder-app" class="recorder"
+     data-csrf="{{ csrf_token }}"
+     data-locale="{{ locale }}"
+     data-chunk-seconds="{{ cfg.recorder_chunk_seconds }}"
+     data-max-seconds="{{ cfg.max_recording_seconds }}"
+     data-i18n='{{ js_strings | tojson }}'>
+
+  <div class="eyebrow">{{ t("rec.new") }}</div>
+  <h1 class="sr-only">{{ t("rec.new") }}</h1>
+
+  <section class="card stage">
+    <button id="btn-record" class="record-btn" disabled aria-label="{{ t('rec.record') }}"></button>
+    <div id="timer" class="timer" aria-live="off">00:00</div>
+    <p id="rec-hint" class="muted small">{{ t("rec.hint_allow") }}</p>
+    <div class="meter" aria-hidden="true"><div id="meter-bar"></div></div>
+    <div class="row controls">
+      <button id="btn-pause" disabled>{{ t("rec.pause") }}</button>
+      <button id="btn-stop" disabled>{{ t("rec.stop") }}</button>
+    </div>
+    <p id="rec-status" class="muted small" role="status" aria-live="polite"></p>
+    <p id="rec-done" class="small" hidden><a id="rec-done-link" href="/">{{ t("rec.open_saved") }} →</a></p>
+  </section>
+
+  <section class="setup stack">
+    <div class="notice">
+      <p>{{ cfg.consent_notice }}</p>
+      <label class="check"><input type="checkbox" id="consent"> {{ t("rec.consent") }}</label>
+    </div>
+    <div class="row">
+      <button id="mic-allow">{{ t("rec.mic_allow") }}</button>
+      <label class="grow"><span class="sr-only">{{ t("rec.mic") }}</span>
+        <select id="mic-select" disabled><option value="">{{ t("rec.mic_none") }}</option></select>
+      </label>
+    </div>
+    <label class="check"><input type="checkbox" id="dsp"> {{ t("rec.dsp") }}</label>
+    <p class="muted small">{{ t("rec.keep_open") }}</p>
+  </section>
+</div>
+<script src="/static/common.js" defer></script>
+<script src="/static/recorder.js" defer></script>
+{% endblock %}

@@ -1,56 +1,67 @@
 {% extends "base.html" %}
 {% block title %}{{ rec.title }} · {{ app_name }}{% endblock %}
 {% block content %}
-<div id="recording-app" data-id="{{ rec.id }}" data-csrf="{{ csrf_token }}" data-i18n='{{ js_strings | tojson }}'>
-  <p><a href="/">← {{ t("tx.back") }}</a></p>
-  <section class="card">
-    <h1 id="rec-title">{{ rec.title }}</h1>
-    {% if rec.audio_url %}<audio id="player" controls preload="metadata" src="{{ rec.audio_url }}"></audio>{% endif %}
-  </section>
-
-  <section class="card">
-    <h2>{{ t("tx.transcript") }} <span id="tx-status" class="badge"></span></h2>
-    <p id="tx-error" class="error" hidden></p>
-    <details>
-      <summary class="muted">{{ t("tx.again") }}</summary>
-      <form id="tx-form" class="row">
-        <label>{{ t("tx.language") }}
-          <select name="language">
-            <option value="">{{ t("tx.lang_default") }}</option>
-            <option value="auto">{{ t("tx.lang_auto") }}</option>
-            <option value="en">English</option><option value="tr">Türkçe</option>
-          </select>
-        </label>
-        <label>{{ t("tx.channel") }}
-          <select name="channel">
-            <option value="">{{ t("tx.lang_default") }}</option>
-            <option value="mix">{{ t("tx.channel_mix") }}</option>
-            {% for n in range(1, (rec.channels or 1) + 1) %}<option value="{{ n }}">{{ t("tx.channel_n", n=n) }}</option>{% endfor %}
-          </select>
-        </label>
-        <button>{{ t("tx.transcribe") }}</button>
-      </form>
-    </details>
-    <div id="speakers" class="row"></div>
-    <div id="segments" class="segments"></div>
-  </section>
-
-  <section class="card">
-    <h2>{{ t("tx.insights") }}</h2>
-    <div class="row" id="insight-buttons">
-      <button data-kind="summary">{{ t("tx.kind_summary") }}</button>
-      <button data-kind="subject">{{ t("tx.kind_subject") }}</button>
-      <button data-kind="speakers">{{ t("tx.kind_speakers") }}</button>
-      <button data-kind="action_items">{{ t("tx.kind_action_items") }}</button>
-      <button data-kind="decisions">{{ t("tx.kind_decisions") }}</button>
+<div id="recording-app" data-id="{{ rec.id }}" data-csrf="{{ csrf_token }}" data-locale="{{ locale }}" data-i18n='{{ js_strings | tojson }}'>
+  <p class="small"><a href="/">← {{ t("tx.back") }}</a></p>
+  <div class="page-head">
+    <div>
+      <h1 id="rec-title">{{ rec.title }}</h1>
+      <p class="lede small" id="rec-meta"></p>
     </div>
-    <form id="ask-form" class="row">
-      <input name="question" class="grow" placeholder="{{ t('tx.ask_placeholder') }}" maxlength="2000">
-      <button>{{ t("tx.ask") }}</button>
-    </form>
-    <p id="insight-msg" class="muted"></p>
-    <div id="insights" class="stack"></div>
-  </section>
+    {% if rec.audio_url %}<a class="button quiet" href="{{ rec.audio_url }}" download>{{ t("rec.download") }}</a>{% endif %}
+  </div>
+
+  <div class="split">
+    <section>
+      {% if rec.audio_url %}<audio id="player" class="player" controls preload="metadata" src="{{ rec.audio_url }}"></audio>{% endif %}
+      <div class="section-head">
+        <h2>{{ t("tx.transcript") }}</h2>
+        <span id="tx-status" class="badge"></span>
+      </div>
+      <p id="tx-error" class="error" hidden></p>
+      <details class="tx-again">
+        <summary>{{ t("tx.again") }}</summary>
+        <form id="tx-form" class="row">
+          <label>{{ t("tx.language") }}
+            <select name="language">
+              <option value="">{{ t("tx.lang_default") }}</option>
+              <option value="auto">{{ t("tx.lang_auto") }}</option>
+              {% for code, name in locales.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+            </select>
+          </label>
+          <label>{{ t("tx.channel") }}
+            <select name="channel">
+              <option value="">{{ t("tx.lang_default") }}</option>
+              <option value="mix">{{ t("tx.channel_mix") }}</option>
+              {% for n in range(1, (rec.channels or 1) + 1) %}<option value="{{ n }}">{{ t("tx.channel_n", n=n) }}</option>{% endfor %}
+            </select>
+          </label>
+          <button>{{ t("tx.transcribe") }}</button>
+        </form>
+      </details>
+      <div id="speakers" class="speakers"></div>
+      <div id="segments" class="segments"></div>
+    </section>
+
+    <aside class="panel sticky">
+      <h2>{{ t("tx.insights") }}</h2>
+      <div class="chips" id="insight-buttons">
+        <button data-kind="summary">{{ t("tx.kind_summary") }}</button>
+        <button data-kind="subject">{{ t("tx.kind_subject") }}</button>
+        <button data-kind="speakers">{{ t("tx.kind_speakers") }}</button>
+        <button data-kind="action_items">{{ t("tx.kind_action_items") }}</button>
+        <button data-kind="decisions">{{ t("tx.kind_decisions") }}</button>
+      </div>
+      <form id="ask-form" class="ask">
+        <label class="sr-only" for="ask-q">{{ t("tx.ask") }}</label>
+        <input id="ask-q" name="question" placeholder="{{ t('tx.ask_placeholder') }}" maxlength="2000">
+        <button class="primary">{{ t("tx.ask") }}</button>
+      </form>
+      <p id="insight-msg" class="error small" hidden></p>
+      <div id="insights"></div>
+    </aside>
+  </div>
 </div>
+<script src="/static/common.js" defer></script>
 <script src="/static/recording.js" defer></script>
 {% endblock %}

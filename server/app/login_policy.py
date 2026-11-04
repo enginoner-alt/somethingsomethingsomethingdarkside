@@ -163,27 +163,26 @@ def verify_oidc() -> list[directory.Step]:
     cfg = get_config()
     steps = [
         directory.Step(
-            "Settings",
+            "oidc_settings",
             cfg.oidc_enabled,
-            "OIDC_ISSUER and OIDC_CLIENT_ID set"
-            if cfg.oidc_enabled
-            else "OIDC_ISSUER / OIDC_CLIENT_ID not set in .env",
+            note="oidc_set" if cfg.oidc_enabled else "oidc_not_set",
         )
     ]
     if not cfg.oidc_enabled:
         return steps
     ok, detail = check_oidc()
-    steps.append(directory.Step("Discovery document", ok, detail))
+    steps.append(directory.Step("discovery", ok, detail))
     if ok:
         url = cfg.oidc_issuer.rstrip("/") + "/.well-known/openid-configuration"
         meta = httpx.get(url, verify=ssl_context(), timeout=3.0).json()
         methods = meta.get("token_endpoint_auth_methods_supported") or ["client_secret_basic"]
-        steps.append(directory.Step("Client secret methods offered", True, ", ".join(methods)))
+        steps.append(directory.Step("secret_methods", True, ", ".join(methods)))
         steps.append(
             directory.Step(
-                "Logout endpoint",
+                "logout_endpoint",
                 bool(meta.get("end_session_endpoint")),
-                meta.get("end_session_endpoint") or "none: logout is app-only",
+                meta.get("end_session_endpoint") or "",
+                note="" if meta.get("end_session_endpoint") else "app_only_logout",
             )
         )
     return steps

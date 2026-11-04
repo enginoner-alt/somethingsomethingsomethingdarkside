@@ -48,6 +48,7 @@ async function newSession(browser, user = USER, pass = PASS) {
 }
 
 async function readyToRecord(page) {
+  if (!page.url().endsWith("/record")) await page.goto(`${APP}/record`);
   await page.check("#consent");
   await page.click("#mic-allow");
   await page.waitForFunction(() => !document.getElementById("btn-record").disabled, null, { timeout: 15000 });
@@ -98,7 +99,7 @@ async function downloadAndCheck(ctx, rec, name, pauses = 0) {
 
   // 1. Normal recording, logged in as an AD user.
   let { ctx, page } = await newSession(browser);
-  check(page.url() === `${APP}/`, `${USER} logs in and lands on the recorder`);
+  check(page.url() === `${APP}/`, `${USER} logs in and lands on the recordings list`);
   check((await ctx.request.get(`${APP}/admin`)).status() === 403, `${USER} is not an admin`);
   await readyToRecord(page);
   const devices = await page.$$eval("#mic-select option", (os) => os.map((o) => o.textContent));
@@ -189,6 +190,7 @@ async function downloadAndCheck(ctx, rec, name, pauses = 0) {
   // 6. Upload an existing file through the page.
   const mp3 = path.join(OUT, "existing.mp3");
   execFileSync("ffmpeg", ["-v", "error", "-y", "-stream_loop", "1", "-i", WAV, "-t", "5", "-c:a", "libmp3lame", mp3]);
+  await page.click(".upload-box summary");
   await page.check("#consent");
   await page.setInputFiles("#upload-file", mp3);
   await page.click("#upload-form button");
@@ -203,7 +205,7 @@ async function downloadAndCheck(ctx, rec, name, pauses = 0) {
   execFileSync("ffmpeg", ["-v", "error", "-y", "-stream_loop", "1", "-i", WAV, "-t", "5", "-c:a", "aac",
     "-movflags", "frag_keyframe+empty_moov+default_base_moof", "-frag_duration", "1000000", fmp4]);
   const bytes = fs.readFileSync(fmp4);
-  const csrf = await page.$eval("#recorder-app", (e) => e.dataset.csrf);
+  const csrf = await page.$eval("#list-app", (e) => e.dataset.csrf);
   const headers = { "X-CSRF-Token": csrf };
   const created = await (await ctx.request.post(`${APP}/api/recordings`, {
     headers, data: { mime_type: "audio/mp4", consent: true, title: "safari-like" } })).json();

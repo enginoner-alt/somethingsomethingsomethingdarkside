@@ -12,7 +12,7 @@ from pathlib import Path
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app import audio_prep, insights, jobs, recordings, services
+from app import audio_prep, errors, insights, jobs, recordings, services
 from app.db import utcnow
 from app.models import Insight, Job, Queue, Recording, Segment, Speaker, Transcript
 from app.registry import handler
@@ -78,11 +78,16 @@ def transcribe_job(db: Session, job: Job) -> dict:
                 recordings.original_path(rec), Path(tmp) / f"{rec.id}.flac", tr.channel
             )
             result = services.transcribe(s, flac, tr.requested_language)
-    except (audio_prep.PrepError, services.ServiceError, OSError) as exc:
-        tr.status, tr.error, tr.finished_at = "failed", str(exc)[:1000], utcnow()
+    except (audio_prep.PrepError, services.ServiceError) as exc:
+        tr.status, tr.error, tr.finished_at = "failed", exc.stored(), utcnow()
         db.commit()
         log.warning("transcription of %s failed: %s", rec.id, exc)
-        return {"ok": False, "error": tr.error}
+        return {"ok": False, "error": str(exc)}
+    except OSError as exc:
+        tr.status, tr.error, tr.finished_at = "failed", errors.encode("os", str(exc)), utcnow()
+        db.commit()
+        log.warning("transcription of %s failed: %s", rec.id, exc)
+        return {"ok": False, "error": str(exc)}
 
     db.execute(delete(Segment).where(Segment.transcript_id == tr.id))
     labels: set[str] = set()
@@ -107,9 +112,7 @@ def transcribe_job(db: Session, job: Job) -> dict:
     tr.raw, tr.language = result, result.get("language") or tr.requested_language
     tr.status, tr.finished_at = "done", utcnow()
     if s.asr_diarize and not labels:
-        tr.error = (
-            "speakers were requested but the service returned none (HF_TOKEN set on the service?)"
-        )
+        tr.error = errors.encode("no_speakers")
     db.commit()
     log.info(
         "transcribed %s: %d segments, %d speakers, %s",
@@ -133,9 +136,9 @@ def insight_job(db: Session, job: Job) -> dict:
     except services.ServiceError as exc:
         db.rollback()
         ins = db.get(Insight, job.payload["insight_id"])
-        ins.status, ins.error, ins.finished_at = "failed", str(exc)[:1000], utcnow()
+        ins.status, ins.error, ins.finished_at = "failed", exc.stored(), utcnow()
         db.commit()
-        return {"ok": False, "error": ins.error}
+        return {"ok": False, "error": str(exc)}
     ins.status, ins.finished_at = "done", utcnow()
     db.commit()
     return {"ok": True, "kind": ins.kind}

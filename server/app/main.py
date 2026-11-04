@@ -51,10 +51,12 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     def home(request: Request, user: Annotated[User, Depends(require_user)]):
-        locale = resolve_locale(request, user)
-        js_strings = {
-            k: i18n.translate(locale, k) for k in i18n.load_locales()["en"] if k.startswith("rec.")
-        }
-        return render(request, "home.html", user, js_strings=js_strings)
+        js = i18n.strings(resolve_locale(request, user), "rec.", "err.")
+        return render(request, "home.html", user, js_strings=js)
+
+    @app.get("/record")
+    def record(request: Request, user: Annotated[User, Depends(require_user)]):
+        js = i18n.strings(resolve_locale(request, user), "rec.", "err.")
+        return render(request, "record.html", user, js_strings=js)
 
     return app

@@ -7,19 +7,16 @@
 (() => {
   const app = document.getElementById("recorder-app");
   if (!app) return;
-  const T = JSON.parse(app.dataset.i18n || "{}");
-  const CSRF = app.dataset.csrf;
+  const { t, errText, api: call } = DS(app);
   const CHUNK_MS = Number(app.dataset.chunkSeconds || 10) * 1000;
   const MAX_S = Number(app.dataset.maxSeconds || 14400);
   const $ = (id) => document.getElementById(id);
-  const t = (key, vars = {}) =>
-    (T[key] || key).replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : `{${k}}`));
 
   const ui = {
     consent: $("consent"), allow: $("mic-allow"), select: $("mic-select"), dsp: $("dsp"),
     bar: $("meter-bar"), record: $("btn-record"), pause: $("btn-pause"), stop: $("btn-stop"),
-    timer: $("timer"), status: $("rec-status"), list: $("rec-list"),
-    uploadForm: $("upload-form"), uploadFile: $("upload-file"), uploadStatus: $("upload-status"),
+    timer: $("timer"), status: $("rec-status"), hint: $("rec-hint"),
+    done: $("rec-done"), doneLink: $("rec-done-link"),
   };
 
   // Exposed for the browser tests (dev/recorder-test); harmless in production.
@@ -32,17 +29,7 @@
   let stream = null, recorder = null, meterCtx = null, wakeLock = null;
   let elapsed = 0, tick = null, pumping = false, backoff = 0;
 
-  const api = async (method, url, body, isBlob = false) => {
-    const headers = { "X-CSRF-Token": CSRF };
-    if (body !== undefined && !isBlob && !(body instanceof FormData)) headers["Content-Type"] = "application/json";
-    const res = await fetch(url, {
-      method, headers, credentials: "same-origin",
-      body: body === undefined ? undefined : isBlob || body instanceof FormData ? body : JSON.stringify(body),
-    });
-    let data = null;
-    try { data = await res.json(); } catch { /* empty body */ }
-    return { ok: res.ok, status: res.status, data };
-  };
+  const api = (method, url, body) => call(method, url, body);
 
   const fmt = (s) => {
     s = Math.floor(s);
@@ -100,6 +87,7 @@
     startMeter();
     ui.record.disabled = false;
     ui.allow.textContent = t("rec.mic_ready");
+    setButtons();
   };
 
   const startMeter = () => {
@@ -145,10 +133,10 @@
         const item = state.queue[0];
         let res;
         try {
-          res = await api("PUT", `/api/recordings/${state.recId}/chunks/${item.seq}`, item.blob, true);
+          res = await api("PUT", `/api/recordings/${state.recId}/chunks/${item.seq}`, item.blob);
         } catch {
-          res = { ok: false, status: 0 }; // network error: offline, reset, timeout
-        }
+          res = { ok: false, status: 0 };
+        } // status 0 = network error: offline, reset, timeout
         if (res.ok) {
           state.queue.shift();
           state.acked += 1;
@@ -158,7 +146,7 @@
         }
         if (res.status === 401) { fail(t("rec.err_session")); return; }
         if ([404, 409, 413, 415].includes(res.status)) {
-          fail((res.data && res.data.message) || `HTTP ${res.status}`);
+          fail(errText(res));
           return;
         }
         // 0 / 5xx / anything else: wait and retry the same chunk.
@@ -184,14 +172,16 @@
       if (res.ok) {
         state.phase = "done";
         showStatus();
-        refreshList();
+        setButtons();
+        ui.doneLink.href = `/recordings/${state.recId}`;
+        ui.done.hidden = false;
         return;
       }
       if (res.status === 409 && res.data && res.data.missing) {
         fail(t("rec.err_missing", { n: res.data.missing.length }));
         return;
       }
-      if (res.status && res.status < 500) { fail((res.data && res.data.message) || `HTTP ${res.status}`); return; }
+      if (res.status && res.status < 500) { fail(errText(res)); return; }
       await waitForRetry(Math.min(1000 * 2 ** attempt, 15000));
     }
     fail(t("rec.err_finalize"));
@@ -212,7 +202,13 @@
     ui.record.disabled = !stream || p === "recording" || p === "paused" || p === "finishing";
     ui.pause.disabled = !(p === "recording" || p === "paused");
     ui.stop.disabled = !(p === "recording" || p === "paused");
-    ui.pause.textContent = p === "paused" ? `▶ ${t("rec.resume")}` : `❚❚ ${t("rec.pause")}`;
+    ui.pause.textContent = p === "paused" ? t("rec.resume") : t("rec.pause");
+    const live = p === "recording" || p === "paused";
+    ui.record.classList.toggle("on", p === "recording");
+    ui.record.setAttribute("aria-label", live ? t("rec.stop") : t("rec.record"));
+    if (live) ui.record.disabled = false; // the big button stops a running recording
+    ui.hint.textContent = !stream ? t("rec.hint_allow") : p === "recording" ? t("rec.hint_recording")
+      : p === "paused" ? t("rec.hint_paused") : p === "finishing" ? t("rec.status_finishing") : t("rec.hint_ready");
     ui.select.disabled = p === "recording" || p === "paused" || p === "finishing";
     ui.dsp.disabled = ui.select.disabled;
   };
@@ -232,10 +228,13 @@
     }
     const mime = pickMime();
     if (!mime) { fail(t("rec.err_unsupported")); return; }
+    const when = new Intl.DateTimeFormat(app.dataset.locale || undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date());
     const res = await api("POST", "/api/recordings", {
-      mime_type: mime, consent: true, title: t("rec.default_title", { when: new Date().toLocaleString() }),
-    }).catch(() => ({ ok: false, status: 0 }));
-    if (!res.ok) { fail((res.data && res.data.message) || t("rec.err_start")); return; }
+      mime_type: mime, consent: true, title: t("rec.default_title", { when }),
+    });
+    if (!res.ok) { fail(res.status ? errText(res) : t("rec.err_start")); return; }
+    ui.done.hidden = true;
+    ui.timer.textContent = fmt(0);
     Object.assign(state, {
       phase: "recording", recId: res.data.id, nextSeq: 0, acked: 0, queue: [], error: null, retries: 0, mime,
     });
@@ -285,77 +284,13 @@
     showStatus();
   };
 
-  // --- list -----------------------------------------------------------------------------
-
-  const el = (tag, attrs = {}, ...children) => {
-    const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
-    }
-    n.append(...children);
-    return n;
-  };
-
-  const refreshList = async () => {
-    const res = await api("GET", "/api/recordings").catch(() => ({ ok: false }));
-    if (!res.ok) return;
-    if (!res.data.length) { ui.list.replaceChildren(el("p", { class: "muted" }, t("rec.empty"))); return; }
-    ui.list.replaceChildren(
-      ...res.data.map((r) => {
-        const meta = [
-          new Date(r.created_at).toLocaleString(),
-          r.duration_seconds != null ? fmt(r.duration_seconds) : null,
-          r.channels ? t("rec.channels", { n: r.channels }) : null,
-          r.source === "upload" ? t("rec.uploaded_file") : null,
-        ].filter(Boolean).join(" · ");
-        const row = el("div", { class: "rec-row", "data-id": r.id },
-          el("div", { class: "rec-head" },
-            el("strong", {}, r.title), " ",
-            el("span", { class: `badge ${r.status === "uploaded" ? "done" : r.status === "recording" ? "running" : "failed"}` }, t(`rec.state_${r.status}`))),
-          el("div", { class: "muted small" }, meta + (r.error ? ` · ${r.error}` : "")));
-        if (r.audio_url) {
-          row.append(el("audio", { controls: "", preload: "none", src: r.audio_url }));
-          row.append(el("div", { class: "row" },
-            el("a", { href: r.page_url }, t("rec.open")),
-            el("a", { href: r.audio_url, download: "" }, t("rec.download")),
-            el("button", { class: "link", onclick: () => remove(r.id) }, t("rec.delete"))));
-        } else if (r.status !== "recording") {
-          row.append(el("button", { class: "link", onclick: () => remove(r.id) }, t("rec.delete")));
-        }
-        return row;
-      }),
-    );
-  };
-
-  const remove = async (id) => {
-    if (!confirm(t("rec.confirm_delete"))) return;
-    await api("DELETE", `/api/recordings/${id}`);
-    refreshList();
-  };
-
-  // --- upload an existing file -------------------------------------------------------------
-
-  ui.uploadForm.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    if (!ui.consent.checked) { ui.uploadStatus.textContent = t("rec.err_consent"); return; }
-    const file = ui.uploadFile.files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("consent", "true");
-    ui.uploadStatus.textContent = t("rec.uploading");
-    const res = await api("POST", "/api/recordings/upload", fd).catch(() => ({ ok: false, status: 0 }));
-    ui.uploadStatus.textContent = res.ok ? t("rec.upload_done") : (res.data && res.data.message) || t("rec.err_upload");
-    if (res.ok) { ui.uploadForm.reset(); refreshList(); }
-  });
-
   // --- wiring ----------------------------------------------------------------------------------
 
   ui.allow.addEventListener("click", () =>
     openMic().catch((e) => { ui.status.textContent = t("rec.err_mic", { error: e.message || e.name }); }));
   ui.select.addEventListener("change", () => openMic().catch(() => {}));
   ui.dsp.addEventListener("change", () => stream && openMic().catch(() => {}));
-  ui.record.addEventListener("click", start);
+  ui.record.addEventListener("click", () => (state.phase === "recording" || state.phase === "paused" ? stop() : start()));
   ui.pause.addEventListener("click", togglePause);
   ui.stop.addEventListener("click", stop);
   window.addEventListener("online", () => { state.online = true; showStatus(); pump(); });
@@ -369,5 +304,4 @@
   navigator.mediaDevices?.addEventListener?.("devicechange", () => listDevices().catch(() => {}));
 
   setButtons();
-  refreshList();
 })();

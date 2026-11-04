@@ -50,11 +50,21 @@ def admin_index(
         request,
         "admin.html",
         admin,
+        section="users",
         users=users,
-        jobs=_recent_jobs(db),
-        queues=Queue.ALL,
         error=error,
         min_password_length=MIN_PASSWORD_LENGTH,
+    )
+
+
+@router.get("/jobs")
+def jobs_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+):
+    return render(
+        request, "admin_jobs.html", admin, section="jobs", jobs=_recent_jobs(db), queues=Queue.ALL
     )
 
 
@@ -102,7 +112,7 @@ def test_job(
     if queue not in Queue.ALL:
         raise HTTPException(status_code=400)
     jobs.enqueue(db, queue, "noop", {"seconds": 2}, user_id=admin.id, max_attempts=1)
-    return RedirectResponse("/admin#jobs", status_code=303)
+    return RedirectResponse("/admin/jobs", status_code=303)
 
 
 @router.get("/jobs.json")
@@ -123,6 +133,7 @@ def _directory_page(request, db, admin, verify_title=None, steps=None, saved=Fal
         request,
         "admin_directory.html",
         admin,
+        section="directory",
         d=s,
         login=settings_store.get_login(db),
         policy=login_policy.current(db),
@@ -206,7 +217,7 @@ def directory_verify_ad(
     try:
         steps = directory.verify(s, test_username, test_password)
     except directory.DirectoryUnavailable as exc:
-        steps = [directory.Step("Directory", False, str(exc))]
+        steps = [directory.Step("directory", False, str(exc))]
     login_policy.clear_health_cache()
     return _directory_page(request, db, admin, verify_title="AD", steps=steps)
 
@@ -226,17 +237,13 @@ def directory_verify_sso(
 
 
 def _services_page(request, db, admin, verify_title=None, steps=None, saved=False, error=None):
-    from app import insights
-
     key = secrets.read_secret(secrets.LLM_API_KEY)
     return render(
         request,
         "admin_services.html",
         admin,
+        section="services",
         s=settings_store.get_services(db),
-        prompts=settings_store.get_prompts(db),
-        defaults=insights.DEFAULT_PROMPTS,
-        kinds=insights.KINDS,
         key_set=key is not None,
         key_fp=secrets.fingerprint(key) if key else None,
         verify_title=verify_title,
@@ -305,6 +312,32 @@ def services_save(
     return RedirectResponse("/admin/services?saved=1", status_code=303)
 
 
+def _prompts_page(request, db, admin, saved=False, error=None):
+    from app import insights
+
+    return render(
+        request,
+        "admin_prompts.html",
+        admin,
+        section="prompts",
+        prompts=settings_store.get_prompts(db),
+        defaults=insights.DEFAULT_PROMPTS,
+        kinds=insights.KINDS,
+        saved=saved,
+        error=error,
+    )
+
+
+@router.get("/prompts")
+def prompts_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+    saved: bool = False,
+):
+    return _prompts_page(request, db, admin, saved=saved)
+
+
 @router.post("/services/prompts", dependencies=[Depends(verify_csrf)])
 async def services_prompts(
     request: Request,
@@ -323,12 +356,12 @@ async def services_prompts(
         try:
             text.format(language="x", transcript="x", question="x")
         except (KeyError, IndexError, ValueError):
-            return _services_page(request, db, admin, error="bad_prompt")
+            return _prompts_page(request, db, admin, error="bad_prompt")
         if text != insights.DEFAULT_PROMPTS[kind]:
             prompts[kind] = text
     settings_store.save_prompts(db, prompts)
     log.info("admin %r saved prompts (%d customised)", admin.username, len(prompts))
-    return RedirectResponse("/admin/services?saved=1#prompts", status_code=303)
+    return RedirectResponse("/admin/prompts?saved=1", status_code=303)
 
 
 @router.post("/services/verify-asr", dependencies=[Depends(verify_csrf)])

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ t("admin.section.jobs") }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% include "_admin_head.html" %}
+<div class="toolbar">
+  <p class="muted small grow">{{ t("admin.jobs_hint") }}</p>
+  {% for q in queues %}
+  <form method="post" action="/admin/jobs/test" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <input type="hidden" name="queue" value="{{ q }}">
+    <button class="quiet">{{ t("admin.test_job", queue=q) }}</button>
+  </form>
+  {% endfor %}
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>#</th><th>{{ t("admin.queue") }}</th><th>{{ t("admin.type") }}</th>
+    <th>{{ t("admin.status") }}</th><th>{{ t("admin.finished") }}</th><th>{{ t("admin.result") }}</th>
+  </tr></thead>
+  <tbody id="job-rows" data-locale="{{ locale }}" data-status-labels='{{ {"queued": t("job.status.queued"), "running": t("job.status.running"), "done": t("job.status.done"), "failed": t("job.status.failed")} | tojson }}'>
+  {% for j in jobs %}
+    <tr><td>{{ j.id }}</td><td>{{ j.queue }}</td><td>{{ j.type }}</td>
+      <td><span class="badge {{ j.status }}">{{ t("job.status." ~ j.status) }}</span></td>
+      <td class="muted">{{ fmt_datetime(j.finished_at) if j.finished_at else "—" }}</td>
+      <td class="mono">{{ j.error.splitlines()[-1] if j.error else "" }}</td></tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">{{ t("admin.no_jobs") }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<script src="/static/admin.js" defer></script>
+{% endblock %}

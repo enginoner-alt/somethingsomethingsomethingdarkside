@@ -30,7 +30,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["templates/*.html", "static/*", "locales/*.json"]
+app = ["templates/*.html", "static/*", "static/fonts/*", "locales/*.json"]
 
 [tool.ruff]
 line-length = 100

@@ -75,12 +75,14 @@ Not yet run against a real WhisperX or LLM.
 
 ## Recording (M2)
 
-The home page is the recorder:
+The home page lists your recordings (search by title, upload a file).
+**New recording** (or **Record** in the top bar) opens the recorder:
 
 1. Tick the consent box (text configurable with `CONSENT_NOTICE`).
 2. Click **Allow microphone** and pick the mic. Leave the browser
    noise-suppression box **off** for conference mics like the XVF3800.
-3. Press **Record**, then **Pause / Resume**, then **Stop**.
+3. Press the red button to start, **Pause / Resume** as needed, and the red
+   button (or **Stop**) to finish.
 
 While recording, the browser sends a piece every `RECORDER_CHUNK_SECONDS`
 (default 10). Each piece stays in the browser until the server confirms it,
@@ -103,6 +105,19 @@ or the container.
 How it's tested (fake microphone, tone markers, network drops, pause, tab
 close, Safari-style MP4): [dev/recorder-test/README.md](dev/recorder-test/README.md).
 
+## Look and language
+
+The pages use the Pantone palette 485 C (red, for record and primary
+actions), Cool Gray 8 C and 877 C (text and lines) and 871 C (gold
+accents), with Source Serif 4 for headings and Montserrat for everything
+else. Tiempos isn't free to bundle, so Source Serif 4 stands in for it.
+Both fonts are in `server/app/static/fonts/` (SIL Open Font License) and
+are served by the app itself: no Google Fonts or other outside requests.
+
+Every text on screen comes from `server/app/locales/<lang>.json`, including
+server errors (sent as codes and translated in the browser) and the Verify
+results. Dates follow the page's language.
+
 ## Transcription and insights (M3)
 
 Configure in **Admin → Services**:
@@ -114,8 +129,8 @@ Configure in **Admin → Services**:
   on/off with min/max hints.
 - **LLM base URL + model** (any OpenAI-compatible server). An API key, if
   needed, goes in `secrets/llm/llm_api_key`.
-- **Verify WhisperX / Verify LLM** buttons, and the **insight prompts**
-  (editable, with reset to defaults).
+- **Verify WhisperX / Verify LLM** buttons. The **insight prompts** are under
+  **Admin → Prompts** (editable, with reset to defaults).
 
 Before sending, the worker turns every recording into **16 kHz mono FLAC**,
 either mixing all channels or using the one you choose.

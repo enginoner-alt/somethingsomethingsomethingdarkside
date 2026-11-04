@@ -256,6 +256,14 @@ def test_delete_then_purge(alice, db, cfg, audio_dir, webm):
     assert db.get(Recording, rec["id"]) is None
 
 
-def test_home_page_has_recorder(alice):
-    page = alice.get("/").text
+def test_home_lists_and_record_page_records(alice):
+    home = alice.get("/").text
+    assert 'id="list-app"' in home and "list.js" in home and 'id="upload-form"' in home
+    page = alice.get("/record").text
     assert 'id="recorder-app"' in page and "recorder.js" in page and "data-chunk-seconds" in page
+
+
+def test_pages_render_in_turkish(alice):
+    alice.cookies.set("lang", "tr")
+    for url in ("/", "/record"):
+        assert "Kayıtlar" in alice.get(url).text

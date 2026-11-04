@@ -8,8 +8,11 @@
     passwords are accepted right now.
 #}
 {% set show_sso = policy.oidc_configured and (policy.oidc_ok or not policy.ad_passwords_allowed) %}
-<section class="card narrow">
+<section class="auth">
+  <div class="eyebrow">{{ app_name }}</div>
   <h1>{{ t("login.title") }}</h1>
+  <p class="lede">{{ t("login.lede") }}</p>
+  <div class="stack">
   {% if error %}<p class="error" role="alert">{{ t("login.error." ~ error) }}</p>{% endif %}
   {% if policy.sso_down_ad_up %}
     <p class="notice" role="status">{{ t("login.sso_down_use_ad") }}</p>
@@ -31,20 +34,21 @@
     <label>{{ t("login.password") }}
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
-    <button class="{{ '' if show_sso else 'primary' }}">{{ t("login.submit") }}</button>
+    <button class="block {{ '' if show_sso else 'primary' }}">{{ t("login.submit") }}</button>
   </form>
   {% endset %}
 
   {% if show_sso and cfg.local_login_mode == "break_glass_only" and not policy.ad_passwords_allowed %}
     <details class="break-glass">
-      <summary class="muted">{{ t("login.break_glass") }}</summary>
+      <summary>{{ t("login.break_glass") }}</summary>
       {{ local_form }}
     </details>
   {% elif show_sso %}
-    <p class="divider muted">{{ t("login.or") }}</p>
+    <p class="divider">{{ t("login.or") }}</p>
     {{ local_form }}
   {% else %}
     {{ local_form }}
   {% endif %}
+  </div>
 </section>
 {% endblock %}

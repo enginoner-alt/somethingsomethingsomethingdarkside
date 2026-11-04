@@ -21,8 +21,9 @@
         badge.className = `badge ${j.status}`;
         badge.textContent = labels[j.status] || j.status;
         status.append(badge);
-        const detail = j.error ? j.error.trim().split("\n").pop() : JSON.stringify(j.result ?? "");
-        tr.append(cell(j.id), cell(j.queue), cell(j.type), status, cell(detail, "mono"));
+        const detail = j.error ? j.error.trim().split("\n").pop() : "";
+        const finished = j.finished_at ? j.finished_at.slice(0, 16).replace("T", " ") : "—";
+        tr.append(cell(j.id), cell(j.queue), cell(j.type), status, cell(finished, "muted"), cell(detail, "mono"));
         return tr;
       }),
     );

@@ -1,0 +1,9 @@
+<div class="page-head"><div>
+  <div class="eyebrow">{{ t("admin.title") }}</div>
+  <h1>{{ t("admin.section." ~ section) }}</h1>
+</div></div>
+<nav class="subnav" aria-label="{{ t('admin.title') }}">
+  {% for key, href in [("users", "/admin"), ("jobs", "/admin/jobs"), ("directory", "/admin/directory"), ("services", "/admin/services"), ("prompts", "/admin/prompts")] %}
+  <a href="{{ href }}" {% if section == key %}class="active" aria-current="page"{% endif %}>{{ t("admin.section." ~ key) }}</a>
+  {% endfor %}
+</nav>

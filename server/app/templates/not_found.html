@@ -1,4 +1,10 @@
 {% extends "base.html" %}
+{% block title %}{{ t("notfound.title") }} · {{ app_name }}{% endblock %}
 {% block content %}
-<section class="card"><h1>404</h1><p><a href="/">{{ t("tx.back") }}</a></p></section>
+<section class="empty">
+  <div class="eyebrow">404</div>
+  <h1>{{ t("notfound.title") }}</h1>
+  <p>{{ t("notfound.body") }}</p>
+  <p><a class="button" href="/">{{ t("tx.back") }}</a></p>
+</section>
 {% endblock %}

@@ -12,10 +12,12 @@ import json
 import subprocess
 from pathlib import Path
 
+from app.errors import CodedError
+
 TARGET_RATE = 16000
 
 
-class PrepError(Exception):
+class PrepError(CodedError):
     pass
 
 
@@ -40,7 +42,7 @@ def channel_count(src: Path) -> int:
     )
     streams = json.loads(res.stdout or "{}").get("streams") or []
     if res.returncode != 0 or not streams or not streams[0].get("channels"):
-        raise PrepError(f"no audio stream in {src.name}")
+        raise PrepError("no_audio", src.name)
     return int(streams[0]["channels"])
 
 
@@ -53,9 +55,9 @@ def pan_filter(channels: int, choice: str) -> str:
     try:
         n = int(choice)
     except ValueError as exc:
-        raise PrepError(f"channel must be 'mix' or a number, got {choice!r}") from exc
+        raise PrepError("bad_channel", repr(choice)) from exc
     if not 1 <= n <= channels:
-        raise PrepError(f"channel {n} requested but the recording has {channels}")
+        raise PrepError("no_such_channel", n=n, channels=channels)
     return f"pan=mono|c0=c{n - 1}"
 
 
@@ -84,5 +86,5 @@ def prepare(src: Path, dst: Path, channel: str = "mix") -> Path:
     ]
     res = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, check=False)
     if res.returncode != 0 or not dst.is_file():
-        raise PrepError((res.stderr or "ffmpeg failed").strip()[:500])
+        raise PrepError("ffmpeg", (res.stderr or "").strip()[:500])
     return dst

@@ -1,52 +1,32 @@
 {% extends "base.html" %}
+{% block title %}{{ t("rec.title") }} · {{ app_name }}{% endblock %}
 {% block content %}
-<div id="recorder-app"
-     data-csrf="{{ csrf_token }}"
-     data-chunk-seconds="{{ cfg.recorder_chunk_seconds }}"
-     data-max-seconds="{{ cfg.max_recording_seconds }}"
-     data-i18n='{{ js_strings | tojson }}'>
-
-  <section class="card">
-    <h1>{{ t("rec.title") }}</h1>
-    <p class="notice">{{ cfg.consent_notice }}</p>
-    <label class="check"><input type="checkbox" id="consent"> {{ t("rec.consent") }}</label>
-  </section>
-
-  <section class="card">
-    <h2>{{ t("rec.new") }}</h2>
-    <div class="stack">
-      <div class="row">
-        <button id="mic-allow">{{ t("rec.mic_allow") }}</button>
-        <label class="grow">{{ t("rec.mic") }}
-          <select id="mic-select" disabled><option value="">{{ t("rec.mic_none") }}</option></select>
-        </label>
-      </div>
-      <label class="check"><input type="checkbox" id="dsp"> {{ t("rec.dsp") }}</label>
-      <div class="meter" aria-hidden="true"><div id="meter-bar"></div></div>
-      <div class="row">
-        <button id="btn-record" class="primary" disabled>● {{ t("rec.record") }}</button>
-        <button id="btn-pause" disabled>❚❚ {{ t("rec.pause") }}</button>
-        <button id="btn-stop" disabled>■ {{ t("rec.stop") }}</button>
-        <span id="timer" class="mono">00:00</span>
-      </div>
-      <p id="rec-status" class="muted" role="status" aria-live="polite"></p>
-      <p class="muted small">{{ t("rec.keep_open") }}</p>
+<div id="list-app" data-csrf="{{ csrf_token }}" data-locale="{{ locale }}" data-i18n='{{ js_strings | tojson }}'>
+  <div class="page-head">
+    <div>
+      <h1>{{ t("rec.title") }}</h1>
+      <p class="lede">{{ t("rec.list_lede") }}</p>
     </div>
-  </section>
+    <a class="button primary" href="/record"><span class="dot" aria-hidden="true"></span>{{ t("rec.new") }}</a>
+  </div>
 
-  <section class="card">
-    <h2>{{ t("rec.upload") }}</h2>
-    <form id="upload-form" class="row">
-      <input type="file" id="upload-file" accept="audio/*,.webm,.ogg,.opus,.m4a,.mp3,.wav,.flac,.aac" required>
-      <button>{{ t("rec.upload_button") }}</button>
-      <span id="upload-status" class="muted"></span>
-    </form>
-  </section>
+  <div class="toolbar">
+    <label class="sr-only" for="rec-search">{{ t("rec.search") }}</label>
+    <input type="search" id="rec-search" placeholder="{{ t('rec.search') }}" autocomplete="off">
+    <span class="grow"></span>
+    <details class="upload-box">
+      <summary>{{ t("rec.upload") }}</summary>
+      <form id="upload-form" class="stack panel">
+        <p class="notice">{{ cfg.consent_notice }}</p>
+        <label class="check"><input type="checkbox" id="consent"> {{ t("rec.consent") }}</label>
+        <input type="file" id="upload-file" accept="audio/*,.webm,.ogg,.opus,.m4a,.mp3,.wav,.flac,.aac" required>
+        <div class="row"><button class="primary">{{ t("rec.upload_button") }}</button><span id="upload-status" class="muted small" role="status"></span></div>
+      </form>
+    </details>
+  </div>
 
-  <section class="card">
-    <h2>{{ t("rec.list") }}</h2>
-    <div id="rec-list" class="stack"><p class="muted">{{ t("rec.loading") }}</p></div>
-  </section>
+  <div id="rec-list" class="rec-list"><p class="muted empty">{{ t("rec.loading") }}</p></div>
 </div>
-<script src="/static/recorder.js" defer></script>
+<script src="/static/common.js" defer></script>
+<script src="/static/list.js" defer></script>
 {% endblock %}

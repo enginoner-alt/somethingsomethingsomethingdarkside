@@ -33,8 +33,8 @@ def test_normalize_guid_forms():
 def test_config_problems(secrets_dir):
     s = DirectorySettings(enabled=True, servers=["ldap://dc01:389"], bind_dn="x", search_base="y")
     problems = directory.config_problems(s)
-    assert any("plain LDAP is refused" in p for p in problems)
-    assert any("ldap_bind_password" in p for p in problems)
+    assert "plain_ldap" in problems
+    assert "no_bind_password" in problems
     (secrets_dir / "ldap_bind_password").write_text("pw\n")
     s.start_tls = True
     assert directory.config_problems(s) == []

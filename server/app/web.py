@@ -118,6 +118,8 @@ def render(
             "locales": i18n.available_locales(),
             "csrf_token": get_csrf_token(request.session),
             "t": lambda key, **params: i18n.translate(locale, key, **params),
+            # Numbers only, so it reads the same in every language.
+            "fmt_datetime": lambda d: d.strftime("%Y-%m-%d %H:%M"),
             **context,
         },
         status_code=status_code,

@@ -67,22 +67,24 @@ def normalize_guid(value: Any) -> str | None:
 
 
 def config_problems(s: DirectorySettings) -> list[str]:
-    """Why these settings can't work, before touching the network."""
+    """Why these settings can't work, before touching the network.
+    Translation keys: `dir.problem.<key>`."""
     problems = []
     if not s.servers:
-        problems.append("no server configured")
+        problems.append("no_server")
     for url in s.servers:
         if url.startswith("ldaps://"):
             continue
         if url.startswith("ldap://") and s.start_tls:
             continue
-        problems.append(f"{url}: use ldaps://, or ldap:// with StartTLS (plain LDAP is refused)")
+        problems.append("plain_ldap")
+        break
     if not s.bind_dn:
-        problems.append("no service account (bind DN)")
+        problems.append("no_bind_dn")
     if not s.search_base:
-        problems.append("no search base")
+        problems.append("no_search_base")
     if secrets.read_secret(secrets.LDAP_BIND_PASSWORD) is None:
-        problems.append("secrets/ldap_bind_password is missing or empty")
+        problems.append("no_bind_password")
     return problems
 
 
@@ -222,9 +224,15 @@ class Directory:
 
 @dataclass
 class Step:
+    """One line of a Verify result. `label` and `note` are translation keys
+    (`step.<label>`, `step.note.<note>`, filled from `params`); `detail` is
+    technical text shown as-is (URLs, DNs, server messages)."""
+
     label: str
     ok: bool
     detail: str = ""
+    note: str = ""
+    params: dict = field(default_factory=dict)
 
 
 def verify(s: DirectorySettings, test_username: str = "", test_password: str = "") -> list[Step]:
@@ -237,7 +245,7 @@ def verify(s: DirectorySettings, test_username: str = "", test_password: str = "
 
     steps: list[Step] = []
     problems = config_problems(s)
-    steps.append(Step("Settings", not problems, "; ".join(problems) or "complete"))
+    steps.append(Step("settings", not problems, note="incomplete" if problems else "complete"))
     if problems:
         return steps
 
@@ -248,10 +256,10 @@ def verify(s: DirectorySettings, test_username: str = "", test_password: str = "
             conn = single.service_connection()
             tls = "LDAPS" if conn.server.ssl else "StartTLS"
             conn.unbind()
-            steps.append(Step(f"{url}", True, f"{tls} certificate verified, service account bound"))
+            steps.append(Step("dc", True, url, note="dc_ok", params={"url": url, "tls": tls}))
             working = working or single
         except DirectoryUnavailable as exc:
-            steps.append(Step(f"{url}", False, str(exc)))
+            steps.append(Step("dc", False, str(exc), params={"url": url}))
     if working is None:
         return steps
 
@@ -260,7 +268,7 @@ def verify(s: DirectorySettings, test_username: str = "", test_password: str = "
         ok = conn.search(s.search_base, s.user_filter, SUBTREE, attributes=["cn"], size_limit=1)
         steps.append(
             Step(
-                "Search base",
+                "search_base",
                 bool(ok) or conn.result.get("description") == "sizeLimitExceeded",
                 f"{s.search_base}: {conn.result.get('description')}",
             )
@@ -270,29 +278,50 @@ def verify(s: DirectorySettings, test_username: str = "", test_password: str = "
         try:
             user = working.find_user(conn, test_username.strip())
         except LDAPException as exc:
-            steps.append(Step(f"Find {test_username}", False, str(exc)))
+            steps.append(Step("find_user", False, str(exc), params={"username": test_username}))
             return steps
     finally:
         conn.unbind()
 
     if user is None:
-        steps.append(Step(f"Find {test_username}", False, "not found (or more than one match)"))
+        steps.append(
+            Step("find_user", False, note="user_not_found", params={"username": test_username})
+        )
         return steps
-    steps.append(Step(f"Find {test_username}", True, f"{user.dn} (objectGUID {user.guid})"))
     steps.append(
-        Step("Account enabled", not user.disabled, "disabled in AD" if user.disabled else "yes")
+        Step(
+            "find_user",
+            True,
+            f"{user.dn} (objectGUID {user.guid})",
+            params={"username": test_username},
+        )
+    )
+    steps.append(
+        Step("account_enabled", not user.disabled, note="disabled" if user.disabled else "yes")
     )
     names = sorted(g for g in user.groups if "=" not in g)
-    steps.append(Step("Groups", True, ", ".join(names) or "none"))
+    steps.append(Step("groups", True, ", ".join(names), note="" if names else "none"))
     if s.required_group:
         hit = group_matches(s.required_group, user.groups)
         steps.append(
-            Step(f"Required group {s.required_group}", hit, "member" if hit else "not a member")
+            Step(
+                "required_group",
+                hit,
+                note="member" if hit else "not_member",
+                params={"group": s.required_group},
+            )
         )
     if s.admin_group:
         hit = group_matches(s.admin_group, user.groups)
-        steps.append(Step(f"Admin group {s.admin_group}", True, "admin" if hit else "not admin"))
+        steps.append(
+            Step(
+                "admin_group",
+                True,
+                note="admin" if hit else "not_admin",
+                params={"group": s.admin_group},
+            )
+        )
     if test_password:
         good = working.check_password(user.dn, test_password)
-        steps.append(Step("Test password", good, "accepted by AD" if good else "rejected by AD"))
+        steps.append(Step("test_password", good, note="pw_accepted" if good else "pw_rejected"))
     return steps
