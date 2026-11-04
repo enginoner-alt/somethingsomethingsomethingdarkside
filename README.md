@@ -167,8 +167,42 @@ Fill in the `OIDC_*` settings in `.env` (see `.env.example`) to add a
   "Emergency administrator login" link and allows only the bootstrap admin.
   That way you can still get in when the identity provider is down.
 
-How this was tested (OpenLDAP + Keycloak + TOTP, 12 scenarios) and what to
-change for AD: [dev/auth-test/README.md](dev/auth-test/README.md).
+**Group names.** `OIDC_REQUIRED_GROUP` / `OIDC_ADMIN_GROUP` accept:
+
+| You write | It matches | Typical source |
+|---|---|---|
+| `darkside-admins` | `darkside-admins`, `/darkside-admins`, or any DN starting with `CN=darkside-admins,` (case-insensitive) | Keycloak, Authentik, PingFederate, NetIQ, ADSSP |
+| `CN=darkside-admins,OU=Groups,DC=corp,DC=local` | only that exact DN | when you want to pin one OU |
+| `3f2a9c1e-…` (GUID) | that group ID | Entra ID group claims |
+
+A plain name matches a group with that name **in any OU**. If people who
+aren't your AD admins can create groups in some OU, use the full DN for
+`OIDC_ADMIN_GROUP`. Set `OIDC_GROUPS_CLAIM` to the claim your provider uses
+(`groups`, `memberOf`, `roles` for Entra App Roles, …). Every SSO login logs
+the groups it received (`docker compose logs api | grep "OIDC login"`), which
+answers "why can't X log in?".
+
+**Client secret.** `OIDC_TOKEN_AUTH_METHOD=auto` (default) reads the
+provider's discovery document and uses HTTP Basic unless the provider only
+accepts the secret in the request body (`client_secret_post`). You can force
+either one.
+
+**Provider notes** (not tested here, these are commercial products; the app
+uses only standard OIDC):
+
+- **Microsoft Entra ID:** issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`.
+  Easiest: create App Roles `darkside-users` / `darkside-admins` and set
+  `OIDC_GROUPS_CLAIM=roles`. Group claims send GUIDs (and nothing at all above
+  200 groups), so App Roles are simpler.
+- **PingFederate / PingOne, NetIQ Access Manager:** map the user's AD groups
+  (usually `memberOf`) into a claim and set `OIDC_GROUPS_CLAIM` to its name.
+  Plain group names then just work.
+- **ManageEngine ADSelfService Plus:** use its OpenID Connect option for
+  custom apps. The app doesn't speak SAML.
+
+How this was tested (OpenLDAP + Keycloak + TOTP, 12 scenarios, also with
+AD-style `memberOf` DNs and `client_secret_post`) and what to change for AD:
+[dev/auth-test/README.md](dev/auth-test/README.md).
 
 ## Operations
 

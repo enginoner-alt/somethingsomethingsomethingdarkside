@@ -41,6 +41,23 @@ slapd 2.6, Chromium), both ways:
   chain from `../make-test-certs.sh`. The app trusts the test CA via `deploy/ca/`,
   with none of the insecure switches below. Three consecutive passes.
 
+### AD-style variant (memberOf DNs + client_secret_post)
+
+Mimics an AD-backed IdP that sends full group DNs:
+
+1. `ldapmodify -Y EXTERNAL -H ldapi:/// -f enable-memberof.ldif` (once), then `./reseed-ldap.sh`.
+2. `AD_STYLE_GROUPS=1 ./configure-keycloak.sh`. This adds a `memberOf` claim
+   with values like `cn=darkside-admins,ou=groups,dc=darkside,dc=test`.
+3. Run the app with `OIDC_GROUPS_CLAIM=memberOf`, the plain names
+   `OIDC_REQUIRED_GROUP=darkside-users` / `OIDC_ADMIN_GROUP=darkside-admins`,
+   and `OIDC_TOKEN_AUTH_METHOD=client_secret_post`.
+4. `node e2e.cjs`
+
+Last run: 12/12. The app log showed only DNs in `memberOf`, and a packet
+capture of the token requests showed the secret in the form body and no
+`Authorization: Basic` header. With `OIDC_TOKEN_AUTH_METHOD=auto` (Keycloak
+supports both), the capture showed Basic and no secret in the body.
+
 ### HTTPS variant
 
 1. `OUT_DIR=./test-certs ../make-test-certs.sh`, then copy `fullchain.pem` and

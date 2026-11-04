@@ -144,7 +144,8 @@ async def oidc_login(request: Request, next: str = "/"):
     request.session["oidc_next"] = safe_next(next)
     redirect_uri = cfg.oidc_redirect_uri or str(request.url_for("oidc_callback"))
     try:
-        return await oidc.get_oauth().idp.authorize_redirect(request, redirect_uri)
+        client = await oidc.prepare_client()
+        return await client.authorize_redirect(request, redirect_uri)
     except Exception:
         # IdP unreachable or misconfigured: say so, and leave the local
         # (break-glass) login usable on the same page.
@@ -156,8 +157,8 @@ async def oidc_login(request: Request, next: str = "/"):
 async def oidc_callback(request: Request, db: Annotated[Session, Depends(get_db)]):
     cfg = get_config()
     next_ = request.session.get("oidc_next", "/")
-    client = oidc.get_oauth().idp
     try:
+        client = await oidc.prepare_client()
         token = await client.authorize_access_token(request)
         claims = dict(token.get("userinfo") or {})
         if cfg.oidc_groups_claim not in claims:

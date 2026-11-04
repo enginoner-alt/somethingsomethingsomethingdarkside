@@ -64,6 +64,9 @@ class Config(BaseSettings):
     # If set, only members of this group may log in at all.
     oidc_required_group: str | None = None
     oidc_button_label: str = "SSO"
+    # How the client secret is sent to the token endpoint. "auto" picks from
+    # the IdP's discovery document (Basic unless only POST is supported).
+    oidc_token_auth_method: Literal["auto", "client_secret_basic", "client_secret_post"] = "auto"
     # Override the callback URL if the proxy setup makes auto-detection wrong,
     # e.g. https://rec.example.com/auth/oidc/callback
     oidc_redirect_uri: str | None = None

@@ -107,4 +107,40 @@ $KCADM create "clients/$CLIENT_ID/protocol-mappers/models" -r darkside \
   -s 'config."id.token.claim"=true' -s 'config."access.token.claim"=true' \
   -s 'config."userinfo.token.claim"=true'
 
+# --- Optional: AD-style group DNs ---------------------------------------------------
+# AD_STYLE_GROUPS=1 also passes the user's LDAP memberOf (full DNs such as
+# cn=darkside-admins,ou=groups,dc=darkside,dc=test) through as a "memberOf"
+# claim, like AD-backed IdPs (PingFederate, NetIQ, ...) typically do. Needs the
+# memberOf overlay in OpenLDAP (enable-memberof.ldif). Use with the app setting
+# OIDC_GROUPS_CLAIM=memberOf.
+if [ "${AD_STYLE_GROUPS:-0}" = "1" ]; then
+  # Keycloak 26 drops attributes not declared in its user profile; allow them.
+  $KCADM get users/profile -r darkside > "${TMPDIR:-/tmp}/kc-profile.json"
+  python3 - "${TMPDIR:-/tmp}/kc-profile.json" <<'PY'
+import json, sys
+p = sys.argv[1]; prof = json.load(open(p))
+prof["unmanagedAttributePolicy"] = "ADMIN_VIEW"
+json.dump(prof, open(p, "w"))
+PY
+  $KCADM update users/profile -r darkside -f "${TMPDIR:-/tmp}/kc-profile.json"
+
+  $KCADM create components -r darkside \
+    -s name=memberOf -s providerId=user-attribute-ldap-mapper \
+    -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+    -s parentId="$LDAP_ID" \
+    -s 'config."ldap.attribute"=["memberOf"]' \
+    -s 'config."user.model.attribute"=["memberOf"]' \
+    -s 'config."read.only"=["true"]' \
+    -s 'config."always.read.value.from.ldap"=["true"]' \
+    -s 'config."is.mandatory.in.ldap"=["false"]'
+
+  $KCADM create "clients/$CLIENT_ID/protocol-mappers/models" -r darkside \
+    -s name=memberOf -s protocol=openid-connect -s protocolMapper=oidc-usermodel-attribute-mapper \
+    -s 'config."user.attribute"=memberOf' -s 'config."claim.name"=memberOf' \
+    -s 'config.multivalued=true' -s 'config."jsonType.label"=String' \
+    -s 'config."id.token.claim"=true' -s 'config."access.token.claim"=true' \
+    -s 'config."userinfo.token.claim"=true'
+  echo "AD-style memberOf claim enabled"
+fi
+
 echo "Keycloak configured: issuer $KC_URL/realms/darkside, client darkside / $CLIENT_SECRET"

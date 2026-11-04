@@ -98,6 +98,8 @@ def test_login_page_shows_sso_when_configured(client, cfg, monkeypatch):
 
 
 class _SlowIdp:
+    client_kwargs = {"token_endpoint_auth_method": "client_secret_basic"}
+
     async def authorize_access_token(self, request):
         raise httpx.ReadTimeout("IdP took too long")
 
@@ -122,5 +124,137 @@ def test_oidc_client_uses_extra_cas_and_longer_timeout(cfg, monkeypatch):
     try:
         kwargs = oidc.get_oauth().idp.client_kwargs
         assert kwargs["timeout"] >= 15 and kwargs["verify"] is not None
+    finally:
+        oidc.get_oauth.cache_clear()
+
+
+# --- AD / LDAP style group names ------------------------------------------------
+
+AD_ADMINS = "CN=darkside-admins,OU=Groups,DC=corp,DC=local"
+
+
+def test_plain_name_matches_ad_dn_case_insensitive():
+    assert oidc.group_matches("darkside-admins", {AD_ADMINS})
+    assert oidc.group_matches("Darkside-Admins", {"cn=DARKSIDE-ADMINS,ou=groups,dc=corp,dc=local"})
+    assert oidc.group_matches("darkside-admins", oidc.normalize_groups(["/darkside-admins"]))
+
+
+def test_plain_name_does_not_match_other_cn_or_ou_part():
+    assert not oidc.group_matches("darkside-admins", {"CN=darkside-admins-old,OU=Groups,DC=x"})
+    assert not oidc.group_matches("Groups", {AD_ADMINS})  # only the CN counts
+    assert not oidc.group_matches("darkside", {AD_ADMINS})
+
+
+def test_full_dn_pins_exact_ou():
+    assert oidc.group_matches(AD_ADMINS, {"cn=darkside-admins, ou=Groups, dc=corp, dc=local"})
+    assert not oidc.group_matches(AD_ADMINS, {"CN=darkside-admins,OU=Other,DC=corp,DC=local"})
+    assert not oidc.group_matches(AD_ADMINS, {"darkside-admins"})
+
+
+def test_escaped_comma_in_cn():
+    dn = r"CN=Sales\, Istanbul,OU=Groups,DC=corp,DC=local"
+    assert oidc.group_matches("Sales, Istanbul", {dn})
+    assert not oidc.group_matches("Sales", {dn})
+
+
+def test_entra_guid_matches_exactly():
+    guid = "3f2a9c1e-8b7d-4e6f-9a0b-1c2d3e4f5a6b"
+    assert oidc.group_matches(guid.upper(), {guid})
+    assert not oidc.group_matches(guid, {"3f2a9c1e-0000-0000-0000-000000000000"})
+
+
+def test_empty_configured_group_never_matches():
+    assert not oidc.group_matches("  ", {"anything"})
+
+
+def test_upsert_with_ad_memberof_groups(db, cfg, monkeypatch):
+    monkeypatch.setattr(cfg, "oidc_groups_claim", "memberOf")
+    monkeypatch.setattr(cfg, "oidc_required_group", "darkside-users")
+    monkeypatch.setattr(cfg, "oidc_admin_group", "darkside-admins")
+    member_of = ["CN=darkside-users,OU=Groups,DC=corp,DC=local", AD_ADMINS]
+    user = oidc.upsert_user(
+        db, {"iss": ISS, "sub": "s", "preferred_username": "u", "memberOf": member_of}, cfg
+    ).user
+    assert user is not None and user.is_admin
+    refused = oidc.upsert_user(
+        db,
+        {
+            "iss": ISS,
+            "sub": "t",
+            "preferred_username": "v",
+            "memberOf": ["CN=other,OU=Groups,DC=corp,DC=local"],
+        },
+        cfg,
+    )
+    assert refused.error == "not_allowed"
+
+
+# --- client_secret_basic vs client_secret_post ------------------------------------
+
+
+def test_pick_token_auth_method():
+    pick = oidc.pick_token_auth_method
+    assert pick({}) == "client_secret_basic"  # spec default
+    assert pick({"token_endpoint_auth_methods_supported": ["client_secret_post"]}) == (
+        "client_secret_post"
+    )
+    both = {"token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"]}
+    assert pick(both) == "client_secret_basic"
+
+
+async def _token_request(method: str) -> httpx.Request:
+    from authlib.integrations.httpx_client import AsyncOAuth2Client
+
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["request"] = request
+        return httpx.Response(200, json={"access_token": "a", "token_type": "Bearer"})
+
+    async with AsyncOAuth2Client(
+        "darkside",
+        "s3cret",
+        token_endpoint_auth_method=method,
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        await client.fetch_token(
+            "https://idp.example/token", grant_type="authorization_code", code="c"
+        )
+    return seen["request"]
+
+
+def test_secret_sent_where_configured():
+    import asyncio
+
+    basic = asyncio.run(_token_request("client_secret_basic"))
+    assert basic.headers.get("authorization", "").startswith("Basic ")
+    assert b"client_secret" not in basic.content
+
+    post = asyncio.run(_token_request("client_secret_post"))
+    assert "authorization" not in post.headers
+    assert b"client_secret=s3cret" in post.content
+
+
+def test_explicit_setting_and_auto_resolution(cfg, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(cfg, "oidc_issuer", ISS)
+    monkeypatch.setattr(cfg, "oidc_client_id", "darkside")
+    monkeypatch.setattr(cfg, "oidc_token_auth_method", "client_secret_post")
+    oidc.get_oauth.cache_clear()
+    try:
+        assert oidc.get_oauth().idp.client_kwargs["token_endpoint_auth_method"] == (
+            "client_secret_post"
+        )
+        monkeypatch.setattr(cfg, "oidc_token_auth_method", "auto")
+        oidc.get_oauth.cache_clear()
+        idp = oidc.get_oauth().idp
+
+        async def fake_metadata():
+            return {"token_endpoint_auth_methods_supported": ["client_secret_post"]}
+
+        monkeypatch.setattr(idp, "load_server_metadata", fake_metadata)
+        asyncio.run(oidc.prepare_client())
+        assert idp.client_kwargs["token_endpoint_auth_method"] == "client_secret_post"
     finally:
         oidc.get_oauth.cache_clear()
