@@ -133,28 +133,31 @@ def test_oidc_client_uses_extra_cas_and_longer_timeout(cfg, monkeypatch):
 AD_ADMINS = "CN=darkside-admins,OU=Groups,DC=corp,DC=local"
 
 
-def test_plain_name_matches_ad_dn_case_insensitive():
-    assert oidc.group_matches("darkside-admins", {AD_ADMINS})
-    assert oidc.group_matches("Darkside-Admins", {"cn=DARKSIDE-ADMINS,ou=groups,dc=corp,dc=local"})
+def test_name_matches_exactly_ignoring_case():
+    assert oidc.group_matches("darkside-admins", {"darkside-admins"})
+    assert oidc.group_matches("Darkside-Admins", {"DARKSIDE-ADMINS"})
     assert oidc.group_matches("darkside-admins", oidc.normalize_groups(["/darkside-admins"]))
+    assert not oidc.group_matches("darkside-admins", {"darkside-admins-old"})
 
 
-def test_plain_name_does_not_match_other_cn_or_ou_part():
-    assert not oidc.group_matches("darkside-admins", {"CN=darkside-admins-old,OU=Groups,DC=x"})
-    assert not oidc.group_matches("Groups", {AD_ADMINS})  # only the CN counts
-    assert not oidc.group_matches("darkside", {AD_ADMINS})
+def test_name_never_matches_a_dn_with_that_cn():
+    """CN is only unique per OU; a same-CN group elsewhere must not count."""
+    assert not oidc.group_matches("darkside-admins", {AD_ADMINS})
+    assert not oidc.group_matches(
+        "darkside-admins", {"CN=darkside-admins,OU=Helpdesk,DC=corp,DC=local"}
+    )
 
 
-def test_full_dn_pins_exact_ou():
+def test_full_dn_matches_only_that_dn():
     assert oidc.group_matches(AD_ADMINS, {"cn=darkside-admins, ou=Groups, dc=corp, dc=local"})
     assert not oidc.group_matches(AD_ADMINS, {"CN=darkside-admins,OU=Other,DC=corp,DC=local"})
     assert not oidc.group_matches(AD_ADMINS, {"darkside-admins"})
 
 
-def test_escaped_comma_in_cn():
+def test_escaped_comma_in_dn():
     dn = r"CN=Sales\, Istanbul,OU=Groups,DC=corp,DC=local"
-    assert oidc.group_matches("Sales, Istanbul", {dn})
-    assert not oidc.group_matches("Sales", {dn})
+    assert oidc.group_matches(dn, {r"cn=sales\, istanbul,ou=groups,dc=corp,dc=local"})
+    assert not oidc.group_matches(dn, {r"CN=Sales\, Ankara,OU=Groups,DC=corp,DC=local"})
 
 
 def test_entra_guid_matches_exactly():
@@ -167,10 +170,10 @@ def test_empty_configured_group_never_matches():
     assert not oidc.group_matches("  ", {"anything"})
 
 
-def test_upsert_with_ad_memberof_groups(db, cfg, monkeypatch):
+def test_upsert_with_ad_memberof_dns(db, cfg, monkeypatch):
     monkeypatch.setattr(cfg, "oidc_groups_claim", "memberOf")
-    monkeypatch.setattr(cfg, "oidc_required_group", "darkside-users")
-    monkeypatch.setattr(cfg, "oidc_admin_group", "darkside-admins")
+    monkeypatch.setattr(cfg, "oidc_required_group", "CN=darkside-users,OU=Groups,DC=corp,DC=local")
+    monkeypatch.setattr(cfg, "oidc_admin_group", AD_ADMINS)
     member_of = ["CN=darkside-users,OU=Groups,DC=corp,DC=local", AD_ADMINS]
     user = oidc.upsert_user(
         db, {"iss": ISS, "sub": "s", "preferred_username": "u", "memberOf": member_of}, cfg

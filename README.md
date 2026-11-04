@@ -167,20 +167,21 @@ Fill in the `OIDC_*` settings in `.env` (see `.env.example`) to add a
   "Emergency administrator login" link and allows only the bootstrap admin.
   That way you can still get in when the identity provider is down.
 
-**Group names.** `OIDC_REQUIRED_GROUP` / `OIDC_ADMIN_GROUP` accept:
+**Group names.** `OIDC_REQUIRED_GROUP` / `OIDC_ADMIN_GROUP` are always
+compared **exactly** (ignoring case) with what the identity provider sends:
 
-| You write | It matches | Typical source |
+| You write | Matches only | Use when the provider sends |
 |---|---|---|
-| `darkside-admins` | `darkside-admins`, `/darkside-admins`, or any DN starting with `CN=darkside-admins,` (case-insensitive) | Keycloak, Authentik, PingFederate, NetIQ, ADSSP |
-| `CN=darkside-admins,OU=Groups,DC=corp,DC=local` | only that exact DN | when you want to pin one OU |
-| `3f2a9c1e-…` (GUID) | that group ID | Entra ID group claims |
+| `darkside-admins` | a group sent as `darkside-admins` | group names. With AD, make it send the group's **sAMAccountName** (unique in the domain) |
+| `CN=darkside-admins,OU=Groups,DC=corp,DC=local` | that exact DN | AD's `memberOf` as-is (full DNs) |
+| `3f2a9c1e-…` (GUID) | that group ID | Entra ID group object IDs |
 
-A plain name matches a group with that name **in any OU**. If people who
-aren't your AD admins can create groups in some OU, use the full DN for
-`OIDC_ADMIN_GROUP`. Set `OIDC_GROUPS_CLAIM` to the claim your provider uses
+There's deliberately no "match the CN inside any DN" shortcut. In AD a CN is
+only unique within its OU, so another OU could hold a different group with
+the same CN. Set `OIDC_GROUPS_CLAIM` to the claim your provider uses
 (`groups`, `memberOf`, `roles` for Entra App Roles, …). Every SSO login logs
-the groups it received (`docker compose logs api | grep "OIDC login"`), which
-answers "why can't X log in?".
+the groups it received (`docker compose logs api | grep "OIDC login"`), so
+you can copy the exact value from there.
 
 **Client secret.** `OIDC_TOKEN_AUTH_METHOD=auto` (default) reads the
 provider's discovery document and uses HTTP Basic unless the provider only
@@ -192,11 +193,12 @@ uses only standard OIDC):
 
 - **Microsoft Entra ID:** issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`.
   Easiest: create App Roles `darkside-users` / `darkside-admins` and set
-  `OIDC_GROUPS_CLAIM=roles`. Group claims send GUIDs (and nothing at all above
-  200 groups), so App Roles are simpler.
+  `OIDC_GROUPS_CLAIM=roles`. Alternatively, for groups synced from AD, Entra
+  can send `sAMAccountName` in the groups claim. By default it sends GUIDs,
+  and nothing at all above 200 groups.
 - **PingFederate / PingOne, NetIQ Access Manager:** map the user's AD groups
-  (usually `memberOf`) into a claim and set `OIDC_GROUPS_CLAIM` to its name.
-  Plain group names then just work.
+  into a claim, preferably as sAMAccountNames, and set `OIDC_GROUPS_CLAIM` to
+  its name. If they arrive as `memberOf` DNs, put the full DNs in the settings.
 - **ManageEngine ADSelfService Plus:** use its OpenID Connect option for
   custom apps. The app doesn't speak SAML.
 

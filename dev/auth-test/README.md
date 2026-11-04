@@ -48,12 +48,15 @@ Mimics an AD-backed IdP that sends full group DNs:
 1. `ldapmodify -Y EXTERNAL -H ldapi:/// -f enable-memberof.ldif` (once), then `./reseed-ldap.sh`.
 2. `AD_STYLE_GROUPS=1 ./configure-keycloak.sh`. This adds a `memberOf` claim
    with values like `cn=darkside-admins,ou=groups,dc=darkside,dc=test`.
-3. Run the app with `OIDC_GROUPS_CLAIM=memberOf`, the plain names
-   `OIDC_REQUIRED_GROUP=darkside-users` / `OIDC_ADMIN_GROUP=darkside-admins`,
-   and `OIDC_TOKEN_AUTH_METHOD=client_secret_post`.
+3. Run the app with `OIDC_GROUPS_CLAIM=memberOf`, the full DNs
+   `OIDC_REQUIRED_GROUP=cn=darkside-users,ou=groups,dc=darkside,dc=test` /
+   `OIDC_ADMIN_GROUP=cn=darkside-admins,ou=groups,dc=darkside,dc=test`, and
+   `OIDC_TOKEN_AUTH_METHOD=client_secret_post`. Plain names deliberately do
+   **not** match DNs.
 4. `node e2e.cjs`
 
-Last run: 12/12. The app log showed only DNs in `memberOf`, and a packet
+Last run: 12/12, with the DNs written in different case than the provider
+sends them. The app log showed only DNs in `memberOf`, and a packet
 capture of the token requests showed the secret in the form body and no
 `Authorization: Basic` header. With `OIDC_TOKEN_AUTH_METHOD=auto` (Keycloak
 supports both), the capture showed Basic and no secret in the body.
@@ -176,6 +179,7 @@ In Keycloak's LDAP provider, the differences from this harness are:
 | users DN | `ou=people,…` | your users OU |
 | bind DN | LDAP admin | a read-only service account |
 | group mapper object class | `groupOfNames` | `group` |
+| group mapper name attribute | `cn` | **`sAMAccountName`** (unique in the domain; the CN is only unique per OU) |
 | cache policy | `NO_CACHE` | `NO_CACHE` |
 
 In AD, a disabled account (`userAccountControl`) is refused by Keycloak automatically.

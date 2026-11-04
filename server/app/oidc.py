@@ -110,29 +110,24 @@ def _canonical(name: str) -> str:
 
 
 def group_matches(configured: str, groups: set[str]) -> bool:
-    """Is the user in `configured`?
+    """Is the user in `configured`? Always an exact match, ignoring case.
 
-    - A plain name ("darkside-admins") matches that exact group name, or an
-      LDAP DN whose first part is CN=darkside-admins, e.g.
-      "CN=darkside-admins,OU=Groups,DC=corp,DC=local" (what AD-backed IdPs
-      like PingFederate or NetIQ often send).
-    - A full DN matches only that exact DN (use this to pin one specific OU).
+    - A name ("darkside-admins") matches only a group sent with exactly that
+      name. With AD, have the IdP send the group's sAMAccountName: unique in
+      the domain, unlike the CN, which is only unique within its OU.
+    - A full DN ("CN=darkside-admins,OU=Groups,DC=corp,DC=local") matches
+      only that DN, ignoring case and spaces after commas, e.g. when the IdP
+      passes AD's memberOf through as-is.
     - IDs such as Entra group GUIDs match exactly.
-    Comparison ignores case, like AD does.
+
+    Deliberately no "CN of any DN" shortcut: another OU may hold a different
+    group with the same CN.
     """
     want = configured.strip().lstrip("/")
     if not want:
         return False
     want_canon = _canonical(want)
-    plain = "=" not in want
-    for group in groups:
-        if _canonical(group) == want_canon:
-            return True
-        if plain:
-            pairs = _split_dn(group)
-            if pairs and pairs[0][0] == "cn" and pairs[0][1].casefold() == want.casefold():
-                return True
-    return False
+    return any(_canonical(group) == want_canon for group in groups)
 
 
 @dataclass
