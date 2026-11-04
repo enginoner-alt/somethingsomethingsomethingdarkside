@@ -7,6 +7,8 @@ local LLM (OpenAI-compatible API) → insights.
 Guiding rule: **no unnecessary complexity.** Every component below must earn
 its place in the POC. Anything else goes in "Later".
 
+Diagrams of all of this: [DIAGRAMS.md](DIAGRAMS.md).
+
 ## Decisions log
 
 | # | Topic | Decision |
