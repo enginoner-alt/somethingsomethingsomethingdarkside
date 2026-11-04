@@ -37,7 +37,10 @@ def models(authorization: str | None = Header(None)):
 
 
 def answer(prompt: str) -> str:
-    low = prompt.lower()
+    # Decide what was asked from the instructions only: the transcript itself
+    # contains words like "Aksiyon" that must not steer the fake.
+    instructions = re.split(r"Transcript( part)?:", prompt)[0]
+    low = instructions.lower()
     q = re.search(r"Question:\s*(.+)", prompt)
     if q:  # a free question; checked first, the transcript itself contains keywords
         return f"FAKE ANSWER to: {q.group(1).strip()}"

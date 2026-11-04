@@ -60,6 +60,13 @@ intact from: Linux, Windows, Android, iOS. Pulling the network for ~30 s
 mid-recording loses no audio. XVF3800 channel behaviour documented.
 
 ## M3 — Transcription
+
+**Status:** built and tested end to end against fake services (the browser
+test runs in CI): 16 kHz mono FLAC prep (mix or one channel, 4-channel test
+file), WhisperX client, auto-transcribe flag + button, transcript page,
+speakers, admin Services page with Verify. **Not yet:** a run against the real
+WhisperX on the 4060 (the "done when" below), transcript text editing, exports.
+
 - Transcription via a **community WhisperX service** container (D25; first
   candidate `onerahmet/openai-whisper-asr-webservice`, GPU image, whisperx
   engine), pinned to a tested version. Our worker is a small client that sends
@@ -79,6 +86,12 @@ speakers) are transcribed and diarized on the 4060 without OOM; processing time
 recorded in README.
 
 ## M4 — Insights
+
+**Status:** built against the fake LLM (pulled forward together with M3):
+summary, meeting subject, speakers (with "use these names"), action items,
+decisions, free question; editable prompts; long transcripts in parts.
+**Not yet:** a real LLM, the transcript-edit change-check, GPU-sharing toggle.
+
 - Admin: LLM endpoints (URL, model, key, context size, purpose), GPU-sharing toggle.
 - Templates: global (admin) + personal (user); sensible defaults
   (summary, action items, decisions, open questions).

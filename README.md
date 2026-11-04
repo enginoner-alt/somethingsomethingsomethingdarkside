@@ -14,8 +14,9 @@ from your own local LLM. Your server, your models, your data.
 - [docs/MILESTONES.md](docs/MILESTONES.md): milestones and acceptance criteria
 - [docs/WINDOWS-WSL.md](docs/WINDOWS-WSL.md): running the POC on Windows via WSL2 (production uses the Linux instructions below)
 
-**Status: M2 (record and push) built and tested in the browser.** Record from any mic,
-upload in pieces that survive network drops, play back, download, delete. Next: M3, transcription.
+**Status: M3 (transcription + insights) built and tested end to end with fake services.** Record or
+upload, transcribe via a WhisperX service, ask an OpenAI-compatible LLM for insights.
+Not yet run against a real WhisperX or LLM.
 
 ## Requirements
 
@@ -101,6 +102,40 @@ or the container.
 
 How it's tested (fake microphone, tone markers, network drops, pause, tab
 close, Safari-style MP4): [dev/recorder-test/README.md](dev/recorder-test/README.md).
+
+## Transcription and insights (M3)
+
+Configure in **Admin → Services**:
+
+- **WhisperX service URL** (the community `whisper-asr-webservice` with
+  `ASR_ENGINE=whisperx`; see [docs/ASR-API.md](docs/ASR-API.md)).
+- **Transcribe automatically** on save (switch), default language
+  (`auto`/`en`/`tr`), default channel (`mix` or a channel number), speakers
+  on/off with min/max hints.
+- **LLM base URL + model** (any OpenAI-compatible server). An API key, if
+  needed, goes in `secrets/llm/llm_api_key`.
+- **Verify WhisperX / Verify LLM** buttons, and the **insight prompts**
+  (editable, with reset to defaults).
+
+Before sending, the worker turns every recording into **16 kHz mono FLAC**,
+either mixing all channels or using the one you choose.
+
+On a recording's page:
+
+- the transcript, with click-to-jump and the current line highlighted;
+- speaker renaming;
+- **Transcribe again** with another language or channel;
+- buttons for **Summary**, **Meeting subject** (also renames the recording),
+  **Who is speaking?** (name suggestions, with "use these names"), **Action
+  items** and **Decisions**;
+- a free **question** box.
+
+Answers come in the transcript's language and are saved, with re-run and
+delete. Long transcripts are done in parts.
+
+**Trying it without a GPU or LLM:** `./darkside fakes up -d` starts a fake
+WhisperX and a fake LLM. Set the URLs `http://whisperx:9000` and
+`http://llm:8000/v1` with model `fake-model`.
 
 ## Certificates
 
@@ -369,5 +404,8 @@ server/tests/            pytest suite (Postgres)
 dev/auth-test/           SSO test harness: OpenLDAP + Keycloak + browser e2e (not deployed)
 dev/ad-test/             AD test harness: Samba AD DC + e2e of the direct AD login (not deployed)
 dev/recorder-test/       recorder e2e: fake mic + tone markers (runs in CI)
+dev/fakes/               fake WhisperX + fake OpenAI-compatible LLM (tests / demo)
+dev/m3-test/             M3 e2e: upload -> transcript -> insights in the browser (runs in CI)
+dev/test-audio/          4-channel tone file
 secrets/                 secret files, api only (git-ignored except README)
 ```

@@ -359,3 +359,20 @@ def test_admin_services_page_save_verify_and_prompts(client, admin, db, configur
 def test_services_page_admin_only(client, regular_user):
     login(client, "alice", "alice-password-1")
     assert client.get("/admin/services").status_code == 403
+
+
+@pytest.mark.parametrize(
+    "kind, expect",
+    [
+        ("summary", "FAKE SUMMARY"),
+        ("decisions", "Sign the office lease"),
+        ("action_items", "moving checklist"),
+        ("subject", "Ofis"),
+    ],
+)
+def test_each_button_gets_its_own_answer(alice, db, configured, kind, expect):
+    rec = ready(alice, db)
+    alice.post(f"/api/recordings/{rec['id']}/insights", json={"kind": kind})
+    drain(db, "llm")
+    [ins] = alice.get(f"/api/recordings/{rec['id']}/insights").json()
+    assert expect in ins["answer"]

@@ -121,6 +121,30 @@ jobs:
           LOGIN_USER=test LOGIN_PASSWORD=ci-test-password \
           OTHER_USER=admin OTHER_PASSWORD=ci-admin-password \
           node dev/recorder-test/e2e_recorder.cjs
+      - name: M3 e2e (fake WhisperX + fake LLM, real workers)
+        run: |
+          (cd dev/fakes && nohup uvicorn --app-dir . fake_whisperx:app --port 19000 > /tmp/fw.log 2>&1 &)
+          (cd dev/fakes && FAKE_LLM_KEY=sk-ci nohup uvicorn --app-dir . fake_llm:app --port 18000 > /tmp/fl.log 2>&1 &)
+          mkdir -p /tmp/ci-secrets/llm && printf 'sk-ci' > /tmp/ci-secrets/llm/llm_api_key
+          cd server
+          (SECRETS_DIR=/tmp/ci-secrets WORKER_ID=worker-asr-1 nohup python -m app.worker --queue gpu > /tmp/wasr.log 2>&1 &)
+          (SECRETS_DIR=/tmp/ci-secrets WORKER_ID=worker-llm-1 nohup python -m app.worker --queue llm > /tmp/wllm.log 2>&1 &)
+          pkill -f "uvicorn app.main" || true
+          (SECRETS_DIR=/tmp/ci-secrets nohup uvicorn app.main:create_app --factory --port 8000 > /tmp/app.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf localhost:8000/healthz && break; sleep 1; done
+          python - <<'PY'
+          import re, httpx
+          c = httpx.Client(base_url="http://localhost:8000", follow_redirects=False, timeout=30)
+          tok = lambda p: re.search(r'name="csrf" value="([^"]+)"', c.get(p).text).group(1)
+          c.post("/login", data={"username": "admin", "password": "ci-admin-password", "csrf": tok("/login")})
+          r = c.post("/admin/services", data={"csrf": tok("/admin/services"), "asr_url": "http://127.0.0.1:19000",
+              "auto_transcribe": "on", "asr_language": "tr", "asr_diarize": "on", "default_channel": "mix",
+              "llm_base_url": "http://127.0.0.1:18000/v1", "llm_model": "fake-model"})
+          assert r.status_code == 303, r.text
+          PY
+          cd ..
+          APP_URL=http://localhost:8000 AUDIO=dev/test-audio/four-channel-tones.wav \
+          LOGIN_USER=test LOGIN_PASSWORD=ci-test-password node dev/m3-test/e2e_m3.cjs
       - name: App log on failure
         if: failure()
-        run: cat /tmp/app.log
+        run: cat /tmp/app.log /tmp/wasr.log /tmp/wllm.log 2>/dev/null || true
