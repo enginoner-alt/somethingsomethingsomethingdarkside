@@ -8,7 +8,7 @@
 #   ./darkside ps                status of all stacks
 #   ./darkside logs [service…]   follow logs (all, or e.g. api postgres)
 #   ./darkside check             verify the network isolation rules
-#   ./darkside <stack> <args…>   any docker compose command on one stack,
+#   ./darkside <stack> <args…>   any docker compose command on one stack (db, app, asr, fakes),
 #                                e.g. ./darkside db exec postgres psql -U darkside
 #
 # Stacks: db (postgres), app (caddy, api, workers), asr (WhisperX, from M3).
@@ -81,7 +81,7 @@ case $cmd in
   check)
     exec "$(dirname "$0")/deploy/check-isolation.sh"
     ;;
-  db|app|asr)
+  db|app|asr|fakes)
     compose "$cmd" "$@"
     ;;
   help|-h|--help)

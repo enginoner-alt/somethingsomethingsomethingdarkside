@@ -1,0 +1,33 @@
+# Fake WhisperX + fake LLM for trying the whole chain without a GPU or LLM.
+# SANDBOX / DEMO ONLY. Start with:  ./darkside fakes up -d
+# Then in Admin -> Services:  WhisperX URL http://whisperx:9000,
+#                             LLM base URL http://llm:8000/v1, model fake-model
+name: darkside-fakes
+
+x-fake: &fake
+  image: darkside-server:local
+  restart: unless-stopped
+  entrypoint: ["uvicorn", "--app-dir", "/fakes"]
+  volumes:
+    - ../../dev/fakes:/fakes:ro
+
+services:
+  fake-whisperx:
+    <<: *fake
+    command: ["fake_whisperx:app", "--host", "0.0.0.0", "--port", "9000"]
+    networks:
+      asr:
+        aliases: [whisperx]
+
+  fake-llm:
+    <<: *fake
+    command: ["fake_llm:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      FAKE_LLM_KEY: ${FAKE_LLM_KEY:-}
+    networks:
+      out:
+        aliases: [llm]
+
+networks:
+  asr: { name: darkside-asr, external: true }
+  out: { name: darkside-out, external: true }
