@@ -72,3 +72,53 @@ def get_login(db: Session) -> LoginSettings:
 
 def save_login(db: Session, settings: LoginSettings) -> None:
     _save(db, LOGIN_KEY, settings)
+
+
+SERVICES_KEY = "services"
+PROMPTS_KEY = "prompts"
+
+
+@dataclass
+class ServicesSettings:
+    # --- transcription (WhisperX service, D25) ---
+    asr_url: str = ""  # e.g. http://whisperx:9000
+    auto_transcribe: bool = True  # start transcription as soon as a recording is saved
+    asr_language: str = "auto"  # auto | en | tr | ...
+    asr_diarize: bool = True
+    asr_min_speakers: int = 0  # 0 = no hint
+    asr_max_speakers: int = 0
+    asr_initial_prompt: str = ""  # vocabulary hint: names, jargon
+    asr_timeout_seconds: int = 3 * 3600
+    default_channel: str = "mix"  # mix | 1..N (D22)
+    # --- LLM (any OpenAI-compatible endpoint); API key in secrets/llm/llm_api_key ---
+    llm_base_url: str = ""  # e.g. http://llm:8000/v1
+    llm_model: str = ""
+    llm_temperature: float = 0.2
+    llm_max_chars: int = 24000  # transcript characters per request; longer ones are done in parts
+    llm_timeout_seconds: int = 300
+
+
+def get_services(db: Session) -> ServicesSettings:
+    return _load(db, SERVICES_KEY, ServicesSettings)
+
+
+def save_services(db: Session, settings: ServicesSettings) -> None:
+    _save(db, SERVICES_KEY, settings)
+
+
+def get_prompts(db: Session) -> dict[str, str]:
+    """Admin-edited prompt templates; missing kinds fall back to the defaults."""
+    from app.insights import DEFAULT_PROMPTS
+
+    row = db.get(Setting, PROMPTS_KEY)
+    saved = dict(row.value) if row else {}
+    return {k: saved.get(k) or v for k, v in DEFAULT_PROMPTS.items()}
+
+
+def save_prompts(db: Session, prompts: dict[str, str]) -> None:
+    row = db.get(Setting, PROMPTS_KEY)
+    if row is None:
+        db.add(Setting(key=PROMPTS_KEY, value=prompts))
+    else:
+        row.value = prompts
+    db.commit()

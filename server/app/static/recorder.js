@@ -316,6 +316,7 @@
         if (r.audio_url) {
           row.append(el("audio", { controls: "", preload: "none", src: r.audio_url }));
           row.append(el("div", { class: "row" },
+            el("a", { href: r.page_url }, t("rec.open")),
             el("a", { href: r.audio_url, download: "" }, t("rec.download")),
             el("button", { class: "link", onclick: () => remove(r.id) }, t("rec.delete"))));
         } else if (r.status !== "recording") {

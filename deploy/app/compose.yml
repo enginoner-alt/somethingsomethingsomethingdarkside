@@ -61,6 +61,10 @@ services:
   worker-llm:
     <<: *server
     command: ["worker", "--queue", "llm"]
+    volumes:
+      - ../ca:/etc/darkside/ca:ro
+      # Only the LLM key's folder, not the AD password next to it.
+      - ../../secrets/llm:/run/darkside-secrets/llm:ro
     environment:
       <<: *db-url
       WORKER_ID: worker-llm-1

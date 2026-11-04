@@ -215,7 +215,7 @@ def finalize(db: Session, rec: Recording, last_seq: int) -> Recording:
     return _assemble(db, rec, list(range(last_seq + 1)), RecordingStatus.UPLOADED)
 
 
-def close_stale(db: Session, user_id: int | None = None) -> int:
+def close_stale(db: Session, user_id: int | None = None) -> list[Recording]:
     """Recordings whose browser went away (no chunk for RECORDING_STALE_SECONDS):
     keep the unbroken run of chunks from 0 and mark them "interrupted".
     Nothing is thrown away silently."""
@@ -223,7 +223,7 @@ def close_stale(db: Session, user_id: int | None = None) -> int:
     q = select(Recording).where(Recording.status == RecordingStatus.RECORDING)
     if user_id is not None:
         q = q.where(Recording.user_id == user_id)
-    closed = 0
+    closed: list[Recording] = []
     for rec in db.scalars(q).all():
         last = rec.last_chunk_at or rec.created_at
         if last > cutoff:
@@ -242,7 +242,7 @@ def close_stale(db: Session, user_id: int | None = None) -> int:
             db.commit()
         else:
             _assemble(db, rec, seqs, RecordingStatus.INTERRUPTED)
-        closed += 1
+        closed.append(rec)
     return closed
 
 

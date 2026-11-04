@@ -38,9 +38,12 @@ def models(authorization: str | None = Header(None)):
 
 def answer(prompt: str) -> str:
     low = prompt.lower()
+    q = re.search(r"Question:\s*(.+)", prompt)
+    if q:  # a free question; checked first, the transcript itself contains keywords
+        return f"FAKE ANSWER to: {q.group(1).strip()}"
     if "json" in low and "speaker" in low:
         names = {}
-        for spk, name in re.findall(r"(SPEAKER_\d+)[^\n]*?\b(?:I'm|ben)\s+([A-ZÇĞİÖŞÜ][\wçğıöşü]+)", prompt):
+        for spk, name in re.findall(r"(SPEAKER_\d+)[^\n]*?\b(?:I'm|[Bb]en)\s+([A-ZÇĞİÖŞÜ][\wçğıöşü]+)", prompt):
             names.setdefault(spk, name)
         return json.dumps({"speakers": [{"label": k, "name": v, "evidence": f"introduces as {v}"}
                                         for k, v in names.items()]}, ensure_ascii=False)
@@ -53,8 +56,7 @@ def answer(prompt: str) -> str:
     if "summar" in low or "özet" in low:
         part = " (part summary)" if "part" in low else ""
         return f"FAKE SUMMARY{part}: planning meeting about the office move; lease to be signed Friday."
-    q = re.search(r"Question:\s*(.+)", prompt)
-    return f"FAKE ANSWER to: {q.group(1).strip() if q else prompt[-80:]}"
+    return f"FAKE ANSWER to: {prompt[-80:]}"
 
 
 @app.post("/v1/chat/completions")

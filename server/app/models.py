@@ -162,3 +162,72 @@ class RecordingChunk(Base):
     size_bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Transcript(Base):
+    """One per recording; replaced when transcribed again."""
+
+    __tablename__ = "transcripts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recording_id: Mapped[str] = mapped_column(
+        ForeignKey("recordings.id", ondelete="CASCADE"), unique=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="queued")  # queued|running|done|failed
+    language: Mapped[str | None] = mapped_column(String(10))
+    requested_language: Mapped[str | None] = mapped_column(String(10))
+    channel: Mapped[str] = mapped_column(String(10), default="mix")
+    error: Mapped[str | None] = mapped_column(Text)
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # the service's JSON, as received
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Segment(Base):
+    __tablename__ = "segments"
+    __table_args__ = (Index("ix_segments_transcript_idx", "transcript_id", "idx"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transcript_id: Mapped[int] = mapped_column(ForeignKey("transcripts.id", ondelete="CASCADE"))
+    idx: Mapped[int] = mapped_column(Integer)
+    start: Mapped[float | None] = mapped_column(Float)
+    end: Mapped[float | None] = mapped_column(Float)
+    speaker: Mapped[str | None] = mapped_column(String(50))  # label, e.g. SPEAKER_00
+    text: Mapped[str] = mapped_column(Text)
+    words: Mapped[list[Any] | None] = mapped_column(JSON)
+
+
+class Speaker(Base):
+    """Display name for a diarization label, per recording."""
+
+    __tablename__ = "speakers"
+    __table_args__ = (UniqueConstraint("recording_id", "label", name="uq_speakers_label"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recording_id: Mapped[str] = mapped_column(ForeignKey("recordings.id", ondelete="CASCADE"))
+    label: Mapped[str] = mapped_column(String(50))
+    name: Mapped[str | None] = mapped_column(String(100))
+
+
+class Insight(Base):
+    """One LLM answer about a recording (a default button or the user's question)."""
+
+    __tablename__ = "insights"
+    __table_args__ = (Index("ix_insights_recording", "recording_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recording_id: Mapped[str] = mapped_column(ForeignKey("recordings.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(
+        String(30)
+    )  # summary|subject|speakers|action_items|decisions|question
+    question: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="queued")  # queued|running|done|failed
+    answer: Mapped[str | None] = mapped_column(Text)
+    data: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON
+    )  # structured extras (speaker suggestions)
+    model: Mapped[str | None] = mapped_column(String(200))
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

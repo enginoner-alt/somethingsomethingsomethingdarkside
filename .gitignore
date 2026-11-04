@@ -15,3 +15,5 @@ test-certs/
 secrets/*
 !secrets/README.md
 node_modules/
+!secrets/llm/
+secrets/llm/*

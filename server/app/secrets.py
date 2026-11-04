@@ -13,6 +13,8 @@ from pathlib import Path
 from app.config import get_config
 
 LDAP_BIND_PASSWORD = "ldap_bind_password"
+# In its own subfolder so only it is mounted into worker-llm (not the AD password).
+LLM_API_KEY = "llm/llm_api_key"
 
 
 def read_secret(name: str) -> str | None:

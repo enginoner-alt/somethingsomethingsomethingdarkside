@@ -15,28 +15,20 @@ import socket
 import threading
 import time
 import traceback
-from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app import jobs
+from app import (
+    jobs,
+    pipeline,  # noqa: F401  (registers the M3 job handlers)
+)
 from app.config import get_config
 from app.db import get_sessionmaker
 from app.models import Job, Queue
+from app.registry import HANDLERS, handler
 
 log = logging.getLogger("worker")
-
-Handler = Callable[[Session, Job], dict[str, Any] | None]
-HANDLERS: dict[str, Handler] = {}
-
-
-def handler(type_: str) -> Callable[[Handler], Handler]:
-    def register(fn: Handler) -> Handler:
-        HANDLERS[type_] = fn
-        return fn
-
-    return register
 
 
 @handler("noop")

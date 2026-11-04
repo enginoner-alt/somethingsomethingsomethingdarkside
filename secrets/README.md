@@ -8,6 +8,7 @@ changes when the value changes.
 | File | Used for |
 |---|---|
 | `ldap_bind_password` | password of the AD service account (Admin → Login methods & Active Directory) |
+| `llm/llm_api_key` | API key of the OpenAI-compatible LLM, if it needs one (Admin → Services). In its own folder: only that folder is mounted into `worker-llm`. |
 
 Create a file with just the value, no quotes, then lock it down and restart the api:
 

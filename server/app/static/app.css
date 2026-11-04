@@ -101,3 +101,12 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .rec-row:last-child { border-bottom: none; }
 .rec-row audio { width: 100%; max-width: 520px; }
 select:disabled, button:disabled { opacity: 0.5; cursor: not-allowed; }
+.segments { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+.seg { padding: 4px 6px; border-radius: 4px; cursor: pointer; line-height: 1.45; }
+.seg:hover { background: var(--bg); }
+.seg.playing { background: var(--bg); outline: 1px solid var(--accent); }
+.spk-0 { color: #3b5bdb; } .spk-1 { color: #c2255c; } .spk-2 { color: #2b8a3e; }
+.spk-3 { color: #e8590c; } .spk-4 { color: #7048e8; } .spk-5 { color: #0b7285; }
+.answer-text { white-space: pre-wrap; font: inherit; margin: 0; }
+#speakers label { flex-direction: row; align-items: center; gap: 6px; }
+#speakers input { width: 10rem; }

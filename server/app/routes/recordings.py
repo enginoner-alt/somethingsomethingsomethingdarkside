@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import recordings
+from app import pipeline, recordings
 from app.config import get_config
 from app.db import get_db
 from app.models import Recording, User
@@ -54,11 +54,13 @@ def as_dict(rec: Recording) -> dict:
         "error": rec.error,
         "created_at": rec.created_at.isoformat() if rec.created_at else None,
         "audio_url": f"/recordings/{rec.id}/audio" if rec.finalized_at and not rec.error else None,
+        "page_url": f"/recordings/{rec.id}",
     }
 
 
 def list_for(db: Session, user: User) -> list[Recording]:
-    recordings.close_stale(db, user.id)
+    for rec in recordings.close_stale(db, user.id):
+        pipeline.maybe_auto_transcribe(db, rec)
     return list(
         db.scalars(
             select(Recording)
@@ -125,9 +127,13 @@ def api_finalize(
     user: Annotated[User, Depends(require_user)],
 ):
     try:
-        rec = recordings.finalize(db, recordings.get_owned(db, user, rec_id), body.last_seq)
+        rec = recordings.get_owned(db, user, rec_id)
+        was_open = rec.finalized_at is None
+        rec = recordings.finalize(db, rec, body.last_seq)
     except RecordingError as exc:
         return error_response(exc)
+    if was_open:
+        pipeline.maybe_auto_transcribe(db, rec)
     return as_dict(rec)
 
 
@@ -143,6 +149,7 @@ def api_upload(
         rec = recordings.upload_file(db, user, file.filename or "", file.file, title, consent)
     except RecordingError as exc:
         return error_response(exc)
+    pipeline.maybe_auto_transcribe(db, rec)
     return as_dict(rec)
 
 
