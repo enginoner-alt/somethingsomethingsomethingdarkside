@@ -83,4 +83,6 @@ GPU-sharing toggle verified with LLM on the same 4060 (no OOM).
 
 ## Later (not scheduled)
 "Download all my data" zip, trash purge job verification, Cross-recording search/Q&A, voiceprint speaker suggestions, multiple workers,
+Podcast engine: LLM writes a script from a meeting's insights, a TTS service
+(another container/URL, like the LLM; D25) voices it. Mind GPU memory on 8 GB.
 DOCX export.
