@@ -302,3 +302,60 @@ def test_mono_opus_browser_recording_also_works(alice, db, configured, tmp_path)
     upload(alice, src, "browser.webm")
     drain(db, "gpu")
     assert db.query(Transcript).one().status == "done"
+
+
+def test_admin_services_page_save_verify_and_prompts(client, admin, db, configured):
+    from app.settings_store import get_prompts, get_services
+
+    login(client, "admin", "admin-password-123")
+    page = client.get("/admin/services").text
+    assert "Insight prompts" in page and "sk-test" not in page and "fingerprint" in page
+    r = client.post(
+        "/admin/services",
+        data={
+            "csrf": csrf_from(page),
+            "asr_url": "http://whisperx:9000/",
+            "auto_transcribe": "on",
+            "asr_language": "TR",
+            "asr_diarize": "on",
+            "asr_max_speakers": "4",
+            "default_channel": "2",
+            "llm_base_url": "http://llm:8000/v1",
+            "llm_model": "fake-model",
+            "llm_max_chars": "5000",
+        },
+        follow_redirects=False,
+    )
+    assert r.headers["location"] == "/admin/services?saved=1"
+    s = get_services(db)
+    assert (s.asr_url, s.asr_language, s.default_channel, s.asr_max_speakers) == (
+        "http://whisperx:9000",
+        "tr",
+        "2",
+        4,
+    )
+    token = csrf_from(client.get("/admin/services").text)
+    bad = client.post("/admin/services", data={"csrf": token, "asr_url": "whisperx:9000"})
+    assert "must start with http" in bad.text
+    assert "OK" in client.post("/admin/services/verify-asr", data={"csrf": token}).text
+    llm = client.post("/admin/services/verify-llm", data={"csrf": token}).text
+    assert "fake-model" in llm
+
+    custom = "Summarise in {language} in one line.\n{transcript}"
+    client.post("/admin/services/prompts", data={"csrf": token, "prompt_summary": custom})
+    db.expire_all()
+    assert get_prompts(db)["summary"] == custom
+    broken = client.post(
+        "/admin/services/prompts", data={"csrf": token, "prompt_summary": "Hi {name}"}
+    )
+    assert "unknown {placeholder}" in broken.text
+    client.post("/admin/services/prompts", data={"csrf": token, "reset": "all"})
+    db.expire_all()
+    from app.insights import DEFAULT_PROMPTS
+
+    assert get_prompts(db) == DEFAULT_PROMPTS
+
+
+def test_services_page_admin_only(client, regular_user):
+    login(client, "alice", "alice-password-1")
+    assert client.get("/admin/services").status_code == 403

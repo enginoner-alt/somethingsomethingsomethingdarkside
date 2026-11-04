@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ t("svc.title") }} · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin">← {{ t("admin.title") }}</a></p>
+<h1>{{ t("svc.title") }}</h1>
+{% if saved %}<p class="notice" role="status">{{ t("dir.saved") }}</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ t("svc.error." ~ error) }}</p>{% endif %}
+
+{% if steps %}
+<section class="card" id="verify">
+  <h2>{{ t("dir.verify_result", what=verify_title) }}</h2>
+  <div class="table-wrap"><table>
+    {% for st in steps %}
+    <tr><td><span class="badge {{ 'done' if st.ok else 'failed' }}">{{ "OK" if st.ok else "FAIL" }}</span></td>
+        <td>{{ st.label }}</td><td class="mono">{{ st.detail }}</td></tr>
+    {% endfor %}
+  </table></div>
+</section>
+{% endif %}
+
+<form method="post" action="/admin/services" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
+  <section class="card stack">
+    <h2>{{ t("svc.asr") }}</h2>
+    <label>{{ t("svc.asr_url") }}<input name="asr_url" value="{{ s.asr_url }}" placeholder="http://whisperx:9000"></label>
+    <label class="check"><input type="checkbox" name="auto_transcribe" {% if s.auto_transcribe %}checked{% endif %}> {{ t("svc.auto_transcribe") }}</label>
+    <div class="row">
+      <label>{{ t("tx.language") }}<input name="asr_language" value="{{ s.asr_language }}" size="6"></label>
+      <label>{{ t("svc.default_channel") }}<input name="default_channel" value="{{ s.default_channel }}" size="6"></label>
+      <label>{{ t("svc.timeout") }}<input name="asr_timeout_seconds" type="number" value="{{ s.asr_timeout_seconds }}"></label>
+    </div>
+    <p class="muted small">{{ t("svc.lang_hint") }} · {{ t("svc.channel_hint") }}</p>
+    <label class="check"><input type="checkbox" name="asr_diarize" {% if s.asr_diarize %}checked{% endif %}> {{ t("svc.diarize") }}</label>
+    <div class="row">
+      <label>{{ t("svc.min_speakers") }}<input name="asr_min_speakers" type="number" min="0" value="{{ s.asr_min_speakers }}"></label>
+      <label>{{ t("svc.max_speakers") }}<input name="asr_max_speakers" type="number" min="0" value="{{ s.asr_max_speakers }}"></label>
+    </div>
+    <label>{{ t("svc.initial_prompt") }}<input name="asr_initial_prompt" value="{{ s.asr_initial_prompt }}"></label>
+  </section>
+
+  <section class="card stack">
+    <h2>{{ t("svc.llm") }}</h2>
+    <label>{{ t("svc.llm_url") }}<input name="llm_base_url" value="{{ s.llm_base_url }}" placeholder="http://llm:8000/v1"></label>
+    <label>{{ t("svc.llm_model") }}<input name="llm_model" value="{{ s.llm_model }}"></label>
+    <div>
+      <strong>{{ t("svc.llm_key") }}</strong>
+      {% if key_set %}<span class="badge done">{{ t("dir.secret_set") }}</span> <span class="muted">{{ t("dir.fingerprint") }} <code>{{ key_fp }}</code></span>
+      {% else %}<span class="badge">{{ t("svc.key_none") }}</span>{% endif %}
+      <p class="muted small">{{ t("svc.key_hint") }}</p>
+    </div>
+    <div class="row">
+      <label>{{ t("svc.temperature") }}<input name="llm_temperature" type="number" step="0.1" min="0" max="2" value="{{ s.llm_temperature }}"></label>
+      <label>{{ t("svc.max_chars") }}<input name="llm_max_chars" type="number" value="{{ s.llm_max_chars }}"></label>
+      <label>{{ t("svc.timeout") }}<input name="llm_timeout_seconds" type="number" value="{{ s.llm_timeout_seconds }}"></label>
+    </div>
+    <p class="muted small">{{ t("svc.max_chars_hint") }}</p>
+  </section>
+  <button class="primary">{{ t("dir.save") }}</button>
+</form>
+
+<section class="card">
+  <div class="row">
+    <form method="post" action="/admin/services/verify-asr" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button>{{ t("svc.verify_asr") }}</button></form>
+    <form method="post" action="/admin/services/verify-llm" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button>{{ t("svc.verify_llm") }}</button></form>
+  </div>
+  <p class="muted small">{{ t("svc.verify_hint") }}</p>
+</section>
+
+<section class="card" id="prompts">
+  <h2>{{ t("svc.prompts") }}</h2>
+  <p class="muted small">{{ t("svc.prompts_hint") }}</p>
+  <form method="post" action="/admin/services/prompts" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    {% for kind in kinds %}
+    <label><strong>{{ t("tx.kind_" ~ kind) }}</strong>{% if prompts[kind] != defaults[kind] %} <span class="badge running">{{ t("svc.customised") }}</span>{% endif %}
+      <textarea name="prompt_{{ kind }}" rows="5">{{ prompts[kind] }}</textarea>
+    </label>
+    <div><button name="reset" value="{{ kind }}" class="link">{{ t("svc.reset_one") }}</button></div>
+    {% endfor %}
+    <div class="row"><button class="primary">{{ t("dir.save") }}</button><button name="reset" value="all">{{ t("svc.reset_all") }}</button></div>
+  </form>
+</section>
+{% endblock %}

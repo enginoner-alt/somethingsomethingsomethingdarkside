@@ -2,7 +2,7 @@
 {% block title %}{{ t("admin.title") }} · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ t("admin.title") }}</h1>
-<p><a href="/admin/directory">{{ t("admin.directory_link") }} →</a></p>
+<p><a href="/admin/directory">{{ t("admin.directory_link") }} →</a> · <a href="/admin/services">{{ t("admin.services_link") }} →</a></p>
 {% if error %}<p class="error" role="alert">{{ t("admin.error." ~ error) }}</p>{% endif %}
 
 <section class="card">
