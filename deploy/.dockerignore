@@ -1,0 +1,6 @@
+# Build context for deploy/db (and later deploy/asr): only the guard is needed.
+# Never send certificates or keys to the Docker builder.
+*
+!guard/
+!guard/**
+!db/Dockerfile
