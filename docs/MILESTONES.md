@@ -51,7 +51,14 @@ intact from: Linux, Windows, Android, iOS. Pulling the network for ~30 s
 mid-recording loses no audio. XVF3800 channel behaviour documented.
 
 ## M3 — Transcription
-- WhisperX worker image (CUDA), models cached in a volume, HF token from env.
+- Transcription via a **community WhisperX service** container (D25; first
+  candidate `onerahmet/openai-whisper-asr-webservice`, GPU image, whisperx
+  engine), pinned to a tested version. Our worker is a small client that sends
+  audio and stores the result, behind a swappable connector. Models cached in
+  a volume, HF token from env.
+- First task: verify the service supports what we need (diarization with
+  min/max speakers, word timestamps, Turkish alignment, long files) on the
+  4060. If not, try the next candidate before writing our own.
 - Transcribe → align → diarize full recording; store segments, words, speaker embeddings.
 - Admin settings: model, compute type, batch size, default language, diarization, speaker hints.
 - Transcript view: speaker-coloured segments, click-to-seek, rename speakers, edit text.
