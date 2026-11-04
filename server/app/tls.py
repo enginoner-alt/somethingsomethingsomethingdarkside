@@ -32,3 +32,21 @@ def ssl_context() -> ssl.SSLContext:
                 except ssl.SSLError as exc:
                     log.error("ignoring %s: not a valid PEM certificate (%s)", path.name, exc)
     return ctx
+
+
+@lru_cache
+def ca_bundle_path() -> str:
+    """The same trust (public CAs + deploy/ca/) as a PEM file, for libraries
+    that want a file instead of an SSLContext (ldap3)."""
+    import tempfile
+
+    parts = [Path(certifi.where()).read_text(encoding="utf-8")]
+    ca_dir = Path(get_config().extra_ca_dir)
+    if ca_dir.is_dir():
+        for path in sorted(ca_dir.iterdir()):
+            if path.suffix.lower() in {".pem", ".crt", ".cer"} and path.is_file():
+                parts.append(path.read_text(encoding="utf-8", errors="replace"))
+    fd, name = tempfile.mkstemp(prefix="darkside-ca-", suffix=".pem")
+    with open(fd, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(parts))
+    return name

@@ -217,6 +217,53 @@ How this was tested (OpenLDAP + Keycloak + TOTP, 12 scenarios, also with
 AD-style `memberOf` DNs and `client_secret_post`) and what to change for AD:
 [dev/auth-test/README.md](dev/auth-test/README.md).
 
+## Active Directory (direct login, the fallback next to SSO)
+
+The app can check passwords against AD itself. It's set up in **Admin →
+Login methods & Active Directory**:
+
+1. Put the service account's password in `secrets/ldap_bind_password` (see
+   [secrets/README.md](secrets/README.md)) and restart the api. A read-only
+   account is enough.
+2. If your DCs' certificates come from your internal CA (AD CS), put that CA's
+   certificate in `deploy/ca/`.
+3. In the admin page, fill in:
+   - the DCs, e.g. `ldaps://dc01.corp.local:636`, one per line, tried in order;
+   - the service account's DN;
+   - the search base;
+   - the required group and the admin group (sAMAccountName or full DN, matched
+     exactly; nested groups count).
+4. Click **Verify AD**, optionally with a test user and password. It shows each
+   DC, the certificate, the service account, and what that user's login would
+   see.
+
+**Which method is used:**
+
+- If SSO and AD both work, the **preferred** one is used (default: SSO). While
+  SSO is preferred and working, AD passwords are refused and users are sent to
+  the SSO button.
+- If only one works, that one is used. If SSO is down, the login page says so
+  and takes AD passwords.
+- If neither works, only local accounts can log in (break-glass admin, test account).
+
+Status is re-checked every 30 seconds. **Verify SSO** and **Verify AD** check
+immediately.
+
+**Security notes:**
+
+- An AD password alone has no MFA. That's why SSO is the default preference.
+- The password form only ever sends passwords to AD over LDAPS or StartTLS.
+  Plain LDAP is refused, and empty passwords are never sent (AD would treat
+  them as an anonymous login).
+- Local accounts win over AD accounts with the same name, so AD can't take
+  over `admin`.
+- Login throttling applies to AD logins too. That also protects your users
+  from AD lockouts triggered through this app.
+- One person, one account: set `OIDC_AD_GUID_CLAIM` so SSO and AD logins of
+  the same person link by AD `objectGUID`.
+
+How it was tested (Samba AD DC, 26 checks): [dev/ad-test/README.md](dev/ad-test/README.md).
+
 ## Operations
 
 **Upgrading from the single `docker-compose.yml` version:** stop the old
@@ -290,4 +337,6 @@ server/app/              FastAPI app, job queue, worker, templates, locales
 server/alembic/          database migrations (applied on api start)
 server/tests/            pytest suite (Postgres)
 dev/auth-test/           SSO test harness: OpenLDAP + Keycloak + browser e2e (not deployed)
+dev/ad-test/             AD test harness: Samba AD DC + e2e of the direct AD login (not deployed)
+secrets/                 secret files, api only (git-ignored except README)
 ```

@@ -48,7 +48,9 @@ def migrated_db():
 @pytest.fixture(autouse=True)
 def clean_tables():
     with get_engine().begin() as conn:
-        conn.execute(text("TRUNCATE jobs, login_failures, users RESTART IDENTITY CASCADE"))
+        conn.execute(
+            text("TRUNCATE jobs, login_failures, settings, users RESTART IDENTITY CASCADE")
+        )
     yield
 
 
@@ -96,3 +98,16 @@ def login(client: TestClient, username: str, password: str):
 def cfg(monkeypatch):
     """The live (cached) config; use monkeypatch.setattr(cfg, ...) to tweak it."""
     return get_config()
+
+
+@pytest.fixture(autouse=True)
+def secrets_dir(tmp_path, monkeypatch):
+    """Each test gets an empty secrets folder; health results aren't shared."""
+    from app import login_policy
+
+    d = tmp_path / "secrets"
+    d.mkdir()
+    monkeypatch.setattr(get_config(), "secrets_dir", str(d))
+    login_policy.clear_health_cache()
+    yield d
+    login_policy.clear_health_cache()

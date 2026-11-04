@@ -20,12 +20,14 @@ from app.db import Base, utcnow
 class AuthSource:
     LOCAL = "local"
     OIDC = "oidc"
+    LDAP = "ldap"
 
 
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("oidc_issuer", "oidc_subject", name="uq_users_oidc_identity"),
+        UniqueConstraint("ad_guid", name="uq_users_ad_guid"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -40,6 +42,9 @@ class User(Base):
     # OIDC identity: (issuer, subject) is the stable key, never the username.
     oidc_issuer: Mapped[str | None] = mapped_column(String(500))
     oidc_subject: Mapped[str | None] = mapped_column(String(255))
+    # Active Directory objectGUID (lowercase, no braces). Links the same
+    # person's SSO and direct-AD logins to one account.
+    ad_guid: Mapped[str | None] = mapped_column(String(36))
     # Bumped to revoke all of this user's sessions (disable, password reset).
     auth_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -96,3 +101,15 @@ class Job(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Setting(Base):
+    """Runtime settings edited in the admin panel (never secrets)."""
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )

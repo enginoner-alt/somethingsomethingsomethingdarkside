@@ -71,6 +71,15 @@ class Config(BaseSettings):
     # e.g. https://rec.example.com/auth/oidc/callback
     oidc_redirect_uri: str | None = None
 
+    # Secret files (one file per secret), mounted read-only into the api
+    # container from secrets/ on the host. See secrets/README.md.
+    secrets_dir: str = "/run/darkside-secrets"
+
+    # OIDC claim carrying the user's AD objectGUID (GUID string, or base64 as
+    # Entra's onPremisesImmutableId). Links SSO and direct-AD logins of the
+    # same person to one account. Empty: no linking.
+    oidc_ad_guid_claim: str | None = None
+
     # Extra CA certificates (internal/self-signed CAs) for outgoing HTTPS.
     # docker-compose mounts deploy/ca/ here; see app/tls.py.
     extra_ca_dir: str = "/etc/darkside/ca"

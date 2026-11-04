@@ -90,3 +90,14 @@ GPU-sharing toggle verified with LLM on the same 4060 (no OOM).
 - Podcast engine: the LLM writes a script from a meeting's insights, and a TTS
   service (another container/URL, like the LLM; D25) voices it. Mind GPU
   memory on 8 GB.
+- Splitting stacks across machines: test it, add TLS for the database
+  connection, and the firewall rules from `docs/NETWORK.md`.
+- Written Postgres major-version upgrade procedure; CI test of an upgrade path
+  (recreate the db container on an existing volume, data intact).
+- Rebuild-safety: all state in one host `data/` folder, read-only containers,
+  logs to the host, more secrets as files (`secrets/`), optional edge stack /
+  DMZ (and the DMZ in the diagrams).
+- Admin-side manual linking of an SSO account and an AD account, for IdPs
+  that can't send the objectGUID.
+- E2E of SSO federated to a real AD (Keycloak → Samba AD) including the
+  objectGUID claim linking.

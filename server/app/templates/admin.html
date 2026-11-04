@@ -2,6 +2,7 @@
 {% block title %}{{ t("admin.title") }} · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ t("admin.title") }}</h1>
+<p><a href="/admin/directory">{{ t("admin.directory_link") }} →</a></p>
 {% if error %}<p class="error" role="alert">{{ t("admin.error." ~ error) }}</p>{% endif %}
 
 <section class="card">
@@ -16,7 +17,7 @@
     {% for u in users %}
       <tr>
         <td>{{ u.username }}{% if u.display_name %} <span class="muted">({{ u.display_name }})</span>{% endif %}{% if cfg.test_account_password and u.username == cfg.test_account_username %} <span class="badge test">{{ t("admin.test_account") }}</span>{% endif %}</td>
-        <td>{{ t("admin.source_" ~ u.auth_source) }}</td>
+        <td>{% if u.oidc_subject %}SSO{% endif %}{% if u.oidc_subject and u.ad_guid %} + {% endif %}{% if u.ad_guid %}AD{% endif %}{% if not u.oidc_subject and not u.ad_guid %}{{ t("admin.source_local") }}{% endif %}</td>
         <td>{{ t("admin.role_admin") if u.is_admin else t("admin.role_user") }}</td>
         <td>{{ t("admin.active") if u.is_active else t("admin.disabled") }}</td>
         <td>{{ u.last_login_at.strftime("%Y-%m-%d %H:%M") if u.last_login_at else "—" }}</td>

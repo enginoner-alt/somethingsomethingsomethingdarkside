@@ -32,7 +32,7 @@ On one machine, `./darkside up` creates the networks and starts `db`, then
 | `darkside-edge` | no | caddy, api | caddy publishes 80/443, proxies to api |
 | `darkside-db` | **yes** | api, worker-asr, worker-llm, postgres | database traffic |
 | `darkside-asr` | **yes** | worker-asr, WhisperX (M3) | transcription requests |
-| `darkside-out` | no | api, worker-llm | outbound: IdP (api), LLM/TTS (worker) |
+| `darkside-out` | no | api, worker-llm | outbound: IdP and AD domain controllers on 636/389 (api), LLM/TTS (worker) |
 
 Who can reach whom, as verified by `./darkside check`:
 
@@ -40,7 +40,7 @@ Who can reach whom, as verified by `./darkside check`:
 |---|---|---|---|---|
 | browser | ✅ 443 | ❌ | ❌ | |
 | caddy | | ✅ | ❌ | (bridge) |
-| api | ❌ | | ✅ | ✅ IdP |
+| api | ❌ | | ✅ | ✅ IdP, AD DCs |
 | worker-asr | ❌ | ❌ | ✅ | ❌ |
 | worker-llm | ❌ | ❌ | ✅ | ✅ LLM |
 | **postgres** | ❌ | ❌ (guard) | | ❌ |

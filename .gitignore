@@ -11,3 +11,6 @@ deploy/ca/*
 !deploy/ca/README.md
 # Output of dev/make-test-certs.sh (contains private keys)
 test-certs/
+# Real secrets (see secrets/README.md)
+secrets/*
+!secrets/README.md

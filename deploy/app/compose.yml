@@ -27,6 +27,10 @@ services:
   api:
     <<: *server
     command: ["api"]
+    volumes:
+      - ../ca:/etc/darkside/ca:ro
+      # Secret files (e.g. ldap_bind_password), api only. See secrets/README.md.
+      - ../../secrets:/run/darkside-secrets:ro
     environment:
       <<: *db-url
     networks: [edge, db, out]

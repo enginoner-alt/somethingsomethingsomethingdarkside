@@ -163,7 +163,20 @@ def upsert_user(db: Session, claims: dict[str, Any], cfg: Config) -> OidcResult:
     username = str(claims.get(cfg.oidc_username_claim) or subject).strip()[:150]
     display_name = claims.get("name") or None
 
+    # AD objectGUID from the IdP (optional): links this SSO identity to the
+    # same person's direct-AD account, so recordings aren't split in two.
+    ad_guid = None
+    if cfg.oidc_ad_guid_claim:
+        from app.directory import normalize_guid
+
+        ad_guid = normalize_guid(claims.get(cfg.oidc_ad_guid_claim))
+
     user = db.scalar(select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject))
+    if user is None and ad_guid:
+        user = db.scalar(select(User).where(User.ad_guid == ad_guid))
+        if user is not None and user.is_active:
+            log.info("linking SSO identity to existing AD account %r", user.username)
+            user.oidc_issuer, user.oidc_subject = issuer, subject
     if user is None:
         if db.scalar(select(User).where(User.username == username)):
             return OidcResult(error="conflict")
@@ -172,6 +185,7 @@ def upsert_user(db: Session, claims: dict[str, Any], cfg: Config) -> OidcResult:
             auth_source=AuthSource.OIDC,
             oidc_issuer=issuer,
             oidc_subject=subject,
+            ad_guid=ad_guid,
             is_admin=False,
         )
         db.add(user)
@@ -180,6 +194,11 @@ def upsert_user(db: Session, claims: dict[str, Any], cfg: Config) -> OidcResult:
     elif user.username != username and not db.scalar(select(User).where(User.username == username)):
         user.username = username  # renamed in the IdP
 
+    if ad_guid and user.ad_guid is None:
+        if db.scalar(select(User).where(User.ad_guid == ad_guid, User.id != user.id)):
+            log.warning("AD GUID %s already belongs to another account; not linking", ad_guid)
+        else:
+            user.ad_guid = ad_guid
     user.display_name = display_name
     if cfg.oidc_admin_group:
         user.is_admin = group_matches(cfg.oidc_admin_group, groups)
