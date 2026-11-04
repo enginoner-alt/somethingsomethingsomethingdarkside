@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import directory, i18n, login_policy, oidc, throttle
+from app import branding, directory, i18n, login_policy, oidc, throttle
 from app.config import get_config
 from app.db import get_db, utcnow
 from app.models import User
@@ -46,6 +46,7 @@ def _login_page(
         next=safe_next(next_),
         error=error,
         policy=login_policy.current(db),
+        has_logo=branding.logo_path() is not None,
     )
 
 

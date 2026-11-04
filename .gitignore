@@ -9,6 +9,8 @@ __pycache__/
 .venv/
 deploy/ca/*
 !deploy/ca/README.md
+deploy/branding/*
+!deploy/branding/README.md
 # Output of dev/make-test-certs.sh (contains private keys)
 test-certs/
 # Real secrets (see secrets/README.md)

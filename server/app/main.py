@@ -3,11 +3,11 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import i18n
+from app import branding, i18n
 from app.config import get_config
 from app.models import User
 from app.routes import admin, auth, recordings, transcripts
@@ -44,6 +44,13 @@ def create_app() -> FastAPI:
             # The recorder needs to know the session ended, not get a login page.
             return JSONResponse({"error": "login_required"}, status_code=401)
         return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+
+    @app.get("/branding/logo")
+    def logo():
+        path = branding.logo_path()
+        if path is None:
+            return Response(status_code=404)
+        return FileResponse(path, headers={"Cache-Control": "public, max-age=300"})
 
     @app.get("/healthz")
     def healthz():

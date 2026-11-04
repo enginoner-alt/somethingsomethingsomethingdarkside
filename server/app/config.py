@@ -104,6 +104,11 @@ class Config(BaseSettings):
     # docker-compose mounts deploy/ca/ here; see app/tls.py.
     extra_ca_dir: str = "/etc/darkside/ca"
 
+    # Your logo for the login page: logo.svg, logo.png or logo.webp in this
+    # folder (docker-compose mounts deploy/branding/ here). Shown at 1943x432
+    # proportions, scaled; without a file the space is simply left empty.
+    branding_dir: str = "/etc/darkside/branding"
+
     @property
     def oidc_enabled(self) -> bool:
         return bool(self.oidc_issuer and self.oidc_client_id)

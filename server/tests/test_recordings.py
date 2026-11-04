@@ -267,3 +267,15 @@ def test_pages_render_in_turkish(alice):
     alice.cookies.set("lang", "tr")
     for url in ("/", "/record"):
         assert "Kayıtlar" in alice.get(url).text
+
+
+def test_login_logo_slot(client, tmp_path, monkeypatch):
+    from app.config import get_config
+
+    monkeypatch.setattr(get_config(), "branding_dir", str(tmp_path))
+    assert client.get("/branding/logo").status_code == 404
+    page = client.get("/login").text
+    assert 'class="logo-slot"' in page and "/branding/logo" not in page
+    (tmp_path / "logo.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    assert client.get("/branding/logo").status_code == 200
+    assert 'src="/branding/logo"' in client.get("/login").text

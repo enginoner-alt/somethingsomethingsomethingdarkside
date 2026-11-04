@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ t("login.title") }} · {{ app_name }}{% endblock %}
+{% block main_class %}flush{% endblock %}
 {% block content %}
 {#
   policy (app/login_policy.py): which methods are configured and working.
@@ -8,8 +9,13 @@
     passwords are accepted right now.
 #}
 {% set show_sso = policy.oidc_configured and (policy.oidc_ok or not policy.ad_passwords_allowed) %}
+<div class="auth-page">
+<aside class="auth-art">
+  {# Space for the logo, 1943 x 432 proportions; empty without deploy/branding/logo.* #}
+  <div class="logo-slot">{% if has_logo %}<img src="/branding/logo" alt="{{ app_name }}">{% endif %}</div>
+  <p class="auth-title">{{ app_name }}</p>
+</aside>
 <section class="auth">
-  <div class="eyebrow">{{ app_name }}</div>
   <h1>{{ t("login.title") }}</h1>
   <p class="lede">{{ t("login.lede") }}</p>
   <div class="stack">
@@ -51,4 +57,5 @@
   {% endif %}
   </div>
 </section>
+</div>
 {% endblock %}

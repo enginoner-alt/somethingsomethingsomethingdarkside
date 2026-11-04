@@ -29,6 +29,8 @@ services:
     command: ["api"]
     volumes:
       - ../ca:/etc/darkside/ca:ro
+      # Optional logo for the login page. See deploy/branding/README.md.
+      - ../branding:/etc/darkside/branding:ro
       # Secret files (e.g. ldap_bind_password), api only. See secrets/README.md.
       - ../../secrets:/run/darkside-secrets:ro
       # Recordings. The only place audio lives; survives rebuilds.
