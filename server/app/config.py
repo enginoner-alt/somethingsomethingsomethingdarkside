@@ -29,6 +29,12 @@ class Config(BaseSettings):
     bootstrap_admin_password: str | None = None
     bootstrap_admin_reset: bool = False
 
+    # Optional local test account (regular user, not admin), created on
+    # startup when a password is set. Enable/disable it in the admin panel;
+    # restarts never re-enable it. Changing the password here updates it.
+    test_account_username: str = "test"
+    test_account_password: str | None = None
+
     default_locale: str = "en"
 
     # --- Login safety -----------------------------------------------------

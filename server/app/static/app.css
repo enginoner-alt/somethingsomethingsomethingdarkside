@@ -89,3 +89,4 @@ a.button.primary { background: var(--accent); color: var(--accent-fg); border-co
 .divider { text-align: center; margin: 16px 0; font-size: 0.9rem; }
 .break-glass { margin-top: 20px; }
 .break-glass summary { cursor: pointer; font-size: 0.9rem; margin-bottom: 12px; }
+.badge.test { color: var(--accent); margin-left: 4px; }

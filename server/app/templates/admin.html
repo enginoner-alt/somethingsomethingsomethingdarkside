@@ -15,7 +15,7 @@
     <tbody>
     {% for u in users %}
       <tr>
-        <td>{{ u.username }}{% if u.display_name %} <span class="muted">({{ u.display_name }})</span>{% endif %}</td>
+        <td>{{ u.username }}{% if u.display_name %} <span class="muted">({{ u.display_name }})</span>{% endif %}{% if cfg.test_account_password and u.username == cfg.test_account_username %} <span class="badge test">{{ t("admin.test_account") }}</span>{% endif %}</td>
         <td>{{ t("admin.source_" ~ u.auth_source) }}</td>
         <td>{{ t("admin.role_admin") if u.is_admin else t("admin.role_user") }}</td>
         <td>{{ t("admin.active") if u.is_active else t("admin.disabled") }}</td>

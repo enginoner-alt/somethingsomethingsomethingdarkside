@@ -51,5 +51,6 @@
   "admin.source": "Giriş",
   "admin.source_local": "Yerel",
   "admin.source_oidc": "SSO",
-  "login.error.sso_unavailable": "Giriş servisine şu an ulaşılamıyor. Daha sonra tekrar dene."
+  "login.error.sso_unavailable": "Giriş servisine şu an ulaşılamıyor. Daha sonra tekrar dene.",
+  "admin.test_account": "test hesabı"
 }

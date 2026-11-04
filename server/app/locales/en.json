@@ -51,5 +51,6 @@
   "admin.source": "Sign-in",
   "admin.source_local": "Local",
   "admin.source_oidc": "SSO",
-  "login.error.sso_unavailable": "The sign-in service is unreachable right now. Try again later."
+  "login.error.sso_unavailable": "The sign-in service is unreachable right now. Try again later.",
+  "admin.test_account": "test account"
 }

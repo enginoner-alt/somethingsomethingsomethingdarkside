@@ -39,6 +39,10 @@ via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record an
 
    Set `BOOTSTRAP_ADMIN_PASSWORD` to something you'll remember.
 
+   Optional: set `TEST_ACCOUNT_PASSWORD` (at least 10 characters) to get a
+   ready-made **local test account** (`test`, a regular user). See
+   [Test account](#test-account).
+
 2. Install the certificate: copy your wildcard **full chain** and **private key** to:
 
    ```
@@ -91,6 +95,38 @@ served by Caddy from `deploy/certs/`; Keycloak on HTTPS with the same
 wildcard; the app trusting the CA from `deploy/ca/`; the full SSO test 3× in a
 row; and without the CA file, SSO refuses the certificate and shows a clear
 message instead of crashing.
+
+## Test account
+
+For trying the app as a normal (non-admin) user on your home machine.
+
+1. In `.env`:
+
+   ```
+   TEST_ACCOUNT_USERNAME=test
+   TEST_ACCOUNT_PASSWORD=pick-a-password-123
+   ```
+
+2. Apply it:
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. Log in as `test` with that password. Use a private window if you're
+   logged in as admin in the normal one.
+
+**Disable / enable:** *Admin → Users*. The test account has a "test account"
+label; click **Disable**. Its open sessions end immediately and it can't log
+in. Click **Enable** to allow it again. Restarting the app never re-enables a
+disabled test account. Change `TEST_ACCOUNT_PASSWORD` and restart to give it a
+new password.
+
+**Remove it:** empty `TEST_ACCOUNT_PASSWORD` stops it being created on new
+installs. An existing test account stays until you disable it.
+
+The test account is a local password account. With
+`LOCAL_LOGIN_MODE=break_glass_only` it can't log in (only the admin can).
 
 ## M0 acceptance test
 
