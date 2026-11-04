@@ -349,5 +349,13 @@
   "common.newer": "Daha yeni",
   "common.older": "Daha eski",
   "common.page_of": "Sayfa {page} / {pages}",
-  "tx.view": "Görünüm"
+  "tx.view": "Görünüm",
+  "svc.banned": "Bu dilleri asla algılama",
+  "svc.banned_hint": "Dil kodları, örn. az (Whisper Türkçeyi sık sık Azerice sanır). Dil auto olduğunda geçerlidir.",
+  "svc.fallback": "Yerine kullan",
+  "svc.fallback_hint": "Algılama yasaklı bir dil seçerse bu dille dök, örn. tr.",
+  "svc.error.bad_language": "Diller tr, en ya da az gibi kodlar olmalı.",
+  "svc.error.fallback_required": "Yasaklı diller yerine kullanılacak dili seçin.",
+  "svc.error.fallback_banned": "Yerine kullanılacak dil yasaklılardan biri olamaz.",
+  "err.asr_detect": "Dil algılama başarısız oldu."
 }

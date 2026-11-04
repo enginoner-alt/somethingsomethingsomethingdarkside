@@ -64,6 +64,41 @@ def transcribe(s: ServicesSettings, flac: Path, language: str | None) -> dict:
     return result
 
 
+def detect_language(s: ServicesSettings, flac: Path) -> str:
+    """POST /detect-language: the service's guess from the first 30 s, e.g. "tr"."""
+    try:
+        with flac.open("rb") as fh:
+            r = httpx.post(
+                s.asr_url.rstrip("/") + "/detect-language",
+                params={"encode": "true"},
+                files={"audio_file": (flac.name, fh, "audio/flac")},
+                timeout=httpx.Timeout(connect=10, read=600, write=600, pool=10),
+                verify=ssl_context(),
+            )
+        r.raise_for_status()
+        return str(r.json()["language_code"]).lower()
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        raise ServiceError("asr_detect", repr(exc)) from exc
+
+
+def choose_language(s: ServicesSettings, flac: Path, requested: str | None) -> str | None:
+    """The language to send. Asked for one: that one. Detecting automatically with
+    banned languages set: detect first, and use the fallback instead of a banned guess."""
+    if requested and requested != "auto":
+        return requested
+    if not s.asr_banned_languages:
+        return None  # let the service detect
+    try:
+        guess = detect_language(s, flac)
+    except ServiceError as exc:
+        log.warning("language detection failed, transcribing without it: %s", exc)
+        return None
+    if guess in s.asr_banned_languages:
+        log.info("detected %r is banned; using %r", guess, s.asr_fallback_language)
+        return s.asr_fallback_language or None
+    return guess
+
+
 def verify_asr(s: ServicesSettings) -> list[Step]:
     steps = [Step("url", bool(s.asr_url), s.asr_url, note="" if s.asr_url else "not_set")]
     if not s.asr_url:

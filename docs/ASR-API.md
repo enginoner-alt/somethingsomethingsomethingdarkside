@@ -27,6 +27,16 @@ Synchronous (blocks until done), one request at a time, whole upload read
 into memory. No authentication: our network isolation protects it (D26).
 Also `POST /detect-language` and Swagger at `/docs`, spec at `/openapi.json`.
 
+**One language per recording.** Whisper/WhisperX guess the language from the
+first 30 s and transcribe the whole file in it; there is no list of allowed
+languages. So the app offers the opposite: **banned languages** (Admin →
+Services). With language `auto` and a banned list, the worker first calls
+`POST /detect-language` (returns `{"detected_language": "turkish",
+"language_code": "tr", "confidence": 0.98}`); a banned guess is replaced by
+the fallback language and sent as `language=`. If detection fails, the file
+is transcribed with `auto`, and a banned result is transcribed again with the
+fallback.
+
 ## Response (`output=json`, media type `text/plain`)
 
 ```json

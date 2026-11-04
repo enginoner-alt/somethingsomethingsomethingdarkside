@@ -349,5 +349,13 @@
   "common.newer": "Newer",
   "common.older": "Older",
   "common.page_of": "Page {page} of {pages}",
-  "tx.view": "View"
+  "tx.view": "View",
+  "svc.banned": "Never detect these languages",
+  "svc.banned_hint": "Language codes, e.g. az (Whisper often hears Turkish as Azerbaijani). Used when the language is set to auto.",
+  "svc.fallback": "Use instead",
+  "svc.fallback_hint": "When detection picks a banned language, transcribe in this one, e.g. tr.",
+  "svc.error.bad_language": "Languages must be codes like tr, en or az.",
+  "svc.error.fallback_required": "Choose a language to use instead of the banned ones.",
+  "svc.error.fallback_banned": "The language to use instead can't be one of the banned ones.",
+  "err.asr_detect": "Language detection failed."
 }

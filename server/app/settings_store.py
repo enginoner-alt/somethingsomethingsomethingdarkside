@@ -84,6 +84,10 @@ class ServicesSettings:
     asr_url: str = ""  # e.g. http://whisperx:9000
     auto_transcribe: bool = True  # start transcription as soon as a recording is saved
     asr_language: str = "auto"  # auto | en | tr | ...
+    # Languages detection may never pick (e.g. "az", which Whisper often hears in
+    # Turkish); when it does, asr_fallback_language is used instead.
+    asr_banned_languages: list[str] = field(default_factory=list)
+    asr_fallback_language: str = ""
     asr_diarize: bool = True
     asr_min_speakers: int = 0  # 0 = no hint
     asr_max_speakers: int = 0

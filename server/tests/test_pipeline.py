@@ -377,3 +377,53 @@ def test_each_button_gets_its_own_answer(alice, db, configured, kind, expect):
     drain(db, "llm")
     [ins] = alice.get(f"/api/recordings/{rec['id']}/insights").json()
     assert expect in ins["answer"]
+
+
+@pytest.mark.parametrize(
+    ("heard", "banned", "sent", "kept"),
+    [
+        ("az", ["az"], "tr", "tr"),  # banned guess -> the fallback is sent
+        ("en", ["az"], "en", "en"),  # allowed guess -> sent as-is
+        ("az", [], None, "az"),  # nothing banned -> the service detects on its own
+    ],
+)
+def test_banned_languages(alice, db, configured, heard, banned, sent, kept):
+    fw, _ = configured
+    fw.DETECT = heard
+    s = ServicesSettings(
+        asr_url="http://whisperx:9000",
+        asr_language="auto",
+        asr_banned_languages=banned,
+        asr_fallback_language="tr" if banned else "",
+    )
+    save_services(db, s)
+    upload(alice)
+    drain(db, "gpu")
+    tr = db.query(Transcript).one()
+    assert tr.status == "done", tr.error
+    assert fw.LAST["language"] == sent and tr.language == kept
+    fw.DETECT = "en"
+
+
+def test_banned_languages_admin_checks(client, admin, db, configured):
+    login(client, "admin", "admin-password-123")
+    token = csrf_from(client.get("/admin/services").text)
+    base = {"csrf": token, "asr_url": "http://whisperx:9000"}
+    bad = client.post("/admin/services", data={**base, "asr_banned_languages": "az"})
+    assert "instead of the banned" in bad.text
+    same = client.post(
+        "/admin/services",
+        data={**base, "asr_banned_languages": "az", "asr_fallback_language": "az"},
+    )
+    assert "be one of the banned" in same.text
+    ok = client.post(
+        "/admin/services",
+        data={**base, "asr_banned_languages": "AZ, kk", "asr_fallback_language": "tr"},
+        follow_redirects=False,
+    )
+    assert ok.status_code == 303
+    from app.settings_store import get_services
+
+    db.expire_all()
+    s = get_services(db)
+    assert (s.asr_banned_languages, s.asr_fallback_language) == (["az", "kk"], "tr")

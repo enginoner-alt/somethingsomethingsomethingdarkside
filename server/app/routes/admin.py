@@ -1,6 +1,7 @@
 """Admin panel. Manages users, settings and jobs — never other users' content (D12)."""
 
 import logging
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -305,9 +306,20 @@ def services_save(
     llm_max_chars: Annotated[int, Form()] = 24000,
     llm_timeout_seconds: Annotated[int, Form()] = 300,
     auto_transcribe: Annotated[bool, Form()] = False,
+    asr_banned_languages: Annotated[str, Form()] = "",
+    asr_fallback_language: Annotated[str, Form()] = "",
     asr_diarize: Annotated[bool, Form()] = False,
 ):
     channel = default_channel.strip().lower() or "mix"
+    banned = sorted({c for c in re.split(r"[\s,;]+", asr_banned_languages.lower()) if c})
+    fallback = asr_fallback_language.strip().lower()
+    codes = banned + ([fallback] if fallback else [])
+    if any(not re.fullmatch(r"[a-z]{2,3}", c) for c in codes):
+        return _services_page(request, db, admin, error="bad_language")
+    if banned and not fallback:
+        return _services_page(request, db, admin, error="fallback_required")
+    if fallback in banned:
+        return _services_page(request, db, admin, error="fallback_banned")
     urls = [u for u in (asr_url.strip(), llm_base_url.strip()) if u]
     if channel != "mix" and not channel.isdigit():
         return _services_page(request, db, admin, error="bad_channel")
@@ -319,6 +331,8 @@ def services_save(
             asr_url=asr_url.strip().rstrip("/"),
             auto_transcribe=auto_transcribe,
             asr_language=asr_language.strip().lower() or "auto",
+            asr_banned_languages=banned,
+            asr_fallback_language=fallback,
             asr_diarize=asr_diarize,
             asr_min_speakers=max(0, asr_min_speakers),
             asr_max_speakers=max(0, asr_max_speakers),

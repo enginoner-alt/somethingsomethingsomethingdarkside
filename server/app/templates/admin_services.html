@@ -21,6 +21,10 @@
         <label>{{ t("svc.default_channel") }}<input name="default_channel" value="{{ s.default_channel }}"><span class="hint small">{{ t("svc.channel_hint") }}</span></label>
         <label>{{ t("svc.timeout") }}<input name="asr_timeout_seconds" type="number" value="{{ s.asr_timeout_seconds }}"></label>
       </div>
+      <div class="fields">
+        <label>{{ t("svc.banned") }}<input name="asr_banned_languages" value="{{ s.asr_banned_languages | join(', ') }}" placeholder="az"><span class="hint small">{{ t("svc.banned_hint") }}</span></label>
+        <label>{{ t("svc.fallback") }}<input name="asr_fallback_language" value="{{ s.asr_fallback_language }}" placeholder="tr"><span class="hint small">{{ t("svc.fallback_hint") }}</span></label>
+      </div>
       <label class="check"><input type="checkbox" name="asr_diarize" {% if s.asr_diarize %}checked{% endif %}> {{ t("svc.diarize") }}</label>
       <div class="fields">
         <label>{{ t("svc.min_speakers") }}<input name="asr_min_speakers" type="number" min="0" value="{{ s.asr_min_speakers }}"></label>

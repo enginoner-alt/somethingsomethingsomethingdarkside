@@ -126,7 +126,9 @@ Configure in **Admin → Services**:
   `ASR_ENGINE=whisperx`; see [docs/ASR-API.md](docs/ASR-API.md)).
 - **Transcribe automatically** on save (switch), default language
   (`auto`/`en`/`tr`), default channel (`mix` or a channel number), speakers
-  on/off with min/max hints.
+  on/off with min/max hints, and **banned languages** with a fallback (e.g.
+  never `az`, use `tr` instead: Whisper often hears Turkish as Azerbaijani).
+  Whisper handles one language per recording.
 - **LLM base URL + model** (any OpenAI-compatible server). An API key, if
   needed, goes in `secrets/llm/llm_api_key`.
 - **Verify WhisperX / Verify LLM** buttons. The **insight prompts** are under

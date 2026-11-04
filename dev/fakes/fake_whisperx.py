@@ -25,6 +25,8 @@ from fastapi.responses import PlainTextResponse
 app = FastAPI(title="fake whisper-asr-webservice (whisperx)")
 STRICT = os.environ.get("FAKE_STRICT", "1") != "0"
 LAST: dict = {}
+# What "detect automatically" hears (tests set it, e.g. to "az").
+DETECT = os.environ.get("FAKE_DETECT_LANGUAGE", "en")
 
 LINES = {
     "en": [
@@ -83,7 +85,7 @@ async def asr(
     if STRICT and (rate != 16000 or channels != 1):
         raise HTTPException(400, f"fake service expects 16 kHz mono, got {rate} Hz / {channels} ch")
 
-    lang = language or "en"
+    lang = language or DETECT
     lines = LINES.get(lang, LINES["en"])
     step = max(duration / len(lines), 0.5)
     segments = []
@@ -114,7 +116,8 @@ async def asr(
 
 @app.post("/detect-language")
 async def detect_language(audio_file: UploadFile = File(...), encode: bool = Query(True)):
-    return {"detected_language": "english", "language_code": "en", "confidence": 0.99}
+    names = {"en": "english", "tr": "turkish", "az": "azerbaijani"}
+    return {"detected_language": names.get(DETECT, DETECT), "language_code": DETECT, "confidence": 0.9}
 
 
 @app.get("/_last")

@@ -77,7 +77,11 @@ def transcribe_job(db: Session, job: Job) -> dict:
             flac = audio_prep.prepare(
                 recordings.original_path(rec), Path(tmp) / f"{rec.id}.flac", tr.channel
             )
-            result = services.transcribe(s, flac, tr.requested_language)
+            language = services.choose_language(s, flac, tr.requested_language)
+            result = services.transcribe(s, flac, language)
+            if not language and result.get("language") in s.asr_banned_languages:
+                # Detection didn't run (or failed): the service guessed a banned language.
+                result = services.transcribe(s, flac, s.asr_fallback_language or None)
     except (audio_prep.PrepError, services.ServiceError) as exc:
         tr.status, tr.error, tr.finished_at = "failed", exc.stored(), utcnow()
         db.commit()
