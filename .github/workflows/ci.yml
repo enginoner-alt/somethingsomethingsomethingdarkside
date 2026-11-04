@@ -129,9 +129,7 @@ jobs:
           cd server
           (SECRETS_DIR=/tmp/ci-secrets WORKER_ID=worker-asr-1 nohup python -m app.worker --queue gpu > /tmp/wasr.log 2>&1 &)
           (SECRETS_DIR=/tmp/ci-secrets WORKER_ID=worker-llm-1 nohup python -m app.worker --queue llm > /tmp/wllm.log 2>&1 &)
-          pkill -f "uvicorn app.main" || true
-          (SECRETS_DIR=/tmp/ci-secrets nohup uvicorn app.main:create_app --factory --port 8000 > /tmp/app.log 2>&1 &)
-          for i in $(seq 1 30); do curl -sf localhost:8000/healthz && break; sleep 1; done
+          # The app keeps running from the recorder step; only the workers need the LLM key.
           python - <<'PY'
           import re, httpx
           c = httpx.Client(base_url="http://localhost:8000", follow_redirects=False, timeout=30)
