@@ -31,6 +31,8 @@ services:
       - ../ca:/etc/darkside/ca:ro
       # Secret files (e.g. ldap_bind_password), api only. See secrets/README.md.
       - ../../secrets:/run/darkside-secrets:ro
+      # Recordings. The only place audio lives; survives rebuilds.
+      - audio:/data/audio
     environment:
       <<: *db-url
     networks: [edge, db, out]
@@ -44,6 +46,9 @@ services:
   worker-asr:
     <<: *server
     command: ["worker", "--queue", "gpu"]
+    volumes:
+      - ../ca:/etc/darkside/ca:ro
+      - audio:/data/audio:ro   # reads recordings to send them to WhisperX (M3)
     environment:
       <<: *db-url
       WORKER_ID: worker-asr-1
@@ -91,3 +96,5 @@ networks:
 volumes:
   caddy_data:
     name: darkside_caddy_data
+  audio:
+    name: darkside_audio

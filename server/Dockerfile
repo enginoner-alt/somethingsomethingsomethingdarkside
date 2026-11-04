@@ -3,7 +3,13 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
-RUN useradd --create-home --uid 10001 app
+# ffmpeg/ffprobe: validate and measure recordings (M2), convert audio (M3).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --uid 10001 app \
+ && mkdir -p /data/audio && chown app:app /data/audio
 WORKDIR /srv
 
 COPY pyproject.toml ./

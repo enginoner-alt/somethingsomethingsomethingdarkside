@@ -111,3 +111,11 @@ def secrets_dir(tmp_path, monkeypatch):
     login_policy.clear_health_cache()
     yield d
     login_policy.clear_health_cache()
+
+
+@pytest.fixture(autouse=True)
+def audio_dir(tmp_path, monkeypatch):
+    d = tmp_path / "audio"
+    d.mkdir()
+    monkeypatch.setattr(get_config(), "audio_dir", str(d))
+    return d

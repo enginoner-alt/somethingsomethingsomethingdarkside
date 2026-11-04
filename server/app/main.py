@@ -3,15 +3,16 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from app import i18n
 from app.config import get_config
 from app.models import User
-from app.routes import admin, auth
+from app.routes import admin, auth, recordings
 from app.tls import ssl_context
-from app.web import LoginRequired, render, require_user
+from app.web import LoginRequired, render, require_user, resolve_locale
 
 
 def create_app() -> FastAPI:
@@ -31,12 +32,16 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
     app.include_router(auth.router)
     app.include_router(admin.router)
+    app.include_router(recordings.router)
 
     if cfg.oidc_enabled:
         ssl_context()  # load trusted CAs now, so the startup log lists them
 
     @app.exception_handler(LoginRequired)
     async def _login_redirect(request: Request, _exc: LoginRequired):
+        if request.url.path.startswith("/api/"):
+            # The recorder needs to know the session ended, not get a login page.
+            return JSONResponse({"error": "login_required"}, status_code=401)
         return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
 
     @app.get("/healthz")
@@ -45,6 +50,10 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     def home(request: Request, user: Annotated[User, Depends(require_user)]):
-        return render(request, "home.html", user)
+        locale = resolve_locale(request, user)
+        js_strings = {
+            k: i18n.translate(locale, k) for k in i18n.load_locales()["en"] if k.startswith("rec.")
+        }
+        return render(request, "home.html", user, js_strings=js_strings)
 
     return app

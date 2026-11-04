@@ -16,5 +16,10 @@
 		-Server
 	}
 
+	# Recording chunks are small; uploaded files can be large (MAX_UPLOAD_BYTES).
+	request_body {
+		max_size 2GB
+	}
+
 	reverse_proxy api:8000
 }

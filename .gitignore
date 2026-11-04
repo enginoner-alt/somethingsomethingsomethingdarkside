@@ -14,3 +14,4 @@ test-certs/
 # Real secrets (see secrets/README.md)
 secrets/*
 !secrets/README.md
+node_modules/

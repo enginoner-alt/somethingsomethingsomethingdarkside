@@ -1,8 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card">
-  <h1>{{ t("home.title") }}</h1>
-  <p>{{ t("home.welcome", name=user.display_name or user.username) }}</p>
-  <p class="muted">{{ t("home.placeholder") }}</p>
-</section>
+<div id="recorder-app"
+     data-csrf="{{ csrf_token }}"
+     data-chunk-seconds="{{ cfg.recorder_chunk_seconds }}"
+     data-max-seconds="{{ cfg.max_recording_seconds }}"
+     data-i18n='{{ js_strings | tojson }}'>
+
+  <section class="card">
+    <h1>{{ t("rec.title") }}</h1>
+    <p class="notice">{{ cfg.consent_notice }}</p>
+    <label class="check"><input type="checkbox" id="consent"> {{ t("rec.consent") }}</label>
+  </section>
+
+  <section class="card">
+    <h2>{{ t("rec.new") }}</h2>
+    <div class="stack">
+      <div class="row">
+        <button id="mic-allow">{{ t("rec.mic_allow") }}</button>
+        <label class="grow">{{ t("rec.mic") }}
+          <select id="mic-select" disabled><option value="">{{ t("rec.mic_none") }}</option></select>
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" id="dsp"> {{ t("rec.dsp") }}</label>
+      <div class="meter" aria-hidden="true"><div id="meter-bar"></div></div>
+      <div class="row">
+        <button id="btn-record" class="primary" disabled>● {{ t("rec.record") }}</button>
+        <button id="btn-pause" disabled>❚❚ {{ t("rec.pause") }}</button>
+        <button id="btn-stop" disabled>■ {{ t("rec.stop") }}</button>
+        <span id="timer" class="mono">00:00</span>
+      </div>
+      <p id="rec-status" class="muted" role="status" aria-live="polite"></p>
+      <p class="muted small">{{ t("rec.keep_open") }}</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>{{ t("rec.upload") }}</h2>
+    <form id="upload-form" class="row">
+      <input type="file" id="upload-file" accept="audio/*,.webm,.ogg,.opus,.m4a,.mp3,.wav,.flac,.aac" required>
+      <button>{{ t("rec.upload_button") }}</button>
+      <span id="upload-status" class="muted"></span>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>{{ t("rec.list") }}</h2>
+    <div id="rec-list" class="stack"><p class="muted">{{ t("rec.loading") }}</p></div>
+  </section>
+</div>
+<script src="/static/recorder.js" defer></script>
 {% endblock %}

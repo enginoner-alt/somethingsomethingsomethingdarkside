@@ -71,6 +71,13 @@ def verify_csrf(request: Request, csrf: Annotated[str | None, Form()] = None) ->
         raise HTTPException(status_code=400, detail="Invalid or missing CSRF token")
 
 
+def verify_csrf_header(request: Request) -> None:
+    """For fetch() calls from our own pages: the CSRF token travels in the
+    X-CSRF-Token header (forms use the hidden field instead)."""
+    if not check_csrf(request.session, request.headers.get("x-csrf-token")):
+        raise HTTPException(status_code=403, detail="Invalid or missing CSRF token")
+
+
 def resolve_locale(request: Request, user: User | None) -> str:
     available = i18n.load_locales()
     for candidate in (user.locale if user else None, request.cookies.get(LANG_COOKIE)):

@@ -27,7 +27,7 @@ def test_translate_fallbacks_and_params():
     assert i18n.translate("tr", "login.title") == "Giriş yap"
     assert i18n.translate("xx", "login.title") == "Sign in"
     assert i18n.translate("en", "no.such.key") == "no.such.key"
-    assert i18n.translate("en", "home.welcome", name="Ada") == "Welcome, Ada."
+    assert i18n.translate("en", "rec.mic_n", n=2) == "Microphone 2"
 
 
 def test_negotiate():

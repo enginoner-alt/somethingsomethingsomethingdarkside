@@ -80,6 +80,26 @@ class Config(BaseSettings):
     # same person to one account. Empty: no linking.
     oidc_ad_guid_claim: str | None = None
 
+    # --- Recordings (M2) ------------------------------------------------------
+    # Where audio files live (a volume; never inside the container image).
+    audio_dir: str = "/data/audio"
+    # Browser sends a chunk every N seconds while recording.
+    recorder_chunk_seconds: int = 10
+    # Hard limit per recording; chunks arriving later than this are refused.
+    max_recording_seconds: int = 4 * 3600
+    max_chunk_bytes: int = 8 * 1024 * 1024
+    max_upload_bytes: int = 2 * 1024 * 1024 * 1024
+    # Per-user storage (all recordings, trash included). 0 = unlimited.
+    user_quota_mb: int = 20 * 1024
+    # No chunk for this long and not finalized: the browser is gone. The
+    # recording is closed with what arrived and marked "interrupted".
+    recording_stale_seconds: int = 600
+    trash_retention_days: int = 30
+    consent_notice: str = (
+        "Before recording, tell everyone in the meeting that it is being recorded "
+        "and transcribed, and get their agreement."
+    )
+
     # Extra CA certificates (internal/self-signed CAs) for outgoing HTTPS.
     # docker-compose mounts deploy/ca/ here; see app/tls.py.
     extra_ca_dir: str = "/etc/darkside/ca"

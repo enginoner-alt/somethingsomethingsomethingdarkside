@@ -93,3 +93,11 @@ a.button.primary { background: var(--accent); color: var(--accent-fg); border-co
 .notice { background: var(--bg); border-left: 3px solid var(--warn); padding: 8px 10px; border-radius: 4px; }
 textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
 code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.grow { flex: 1; min-width: 200px; }
+.small { font-size: 0.85rem; }
+.meter { height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.meter > div { height: 100%; width: 0; background: var(--ok); transition: width 80ms linear; }
+.rec-row { border-bottom: 1px solid var(--border); padding: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+.rec-row:last-child { border-bottom: none; }
+.rec-row audio { width: 100%; max-width: 520px; }
+select:disabled, button:disabled { opacity: 0.5; cursor: not-allowed; }

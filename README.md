@@ -14,8 +14,8 @@ from your own local LLM. Your server, your models, your data.
 - [docs/MILESTONES.md](docs/MILESTONES.md): milestones and acceptance criteria
 - [docs/WINDOWS-WSL.md](docs/WINDOWS-WSL.md): running the POC on Windows via WSL2 (production uses the Linux instructions below)
 
-**Status: M1 (safe login) done.** Local login is hardened, and optional SSO
-via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record and push.
+**Status: M2 (record and push) built and tested in the browser.** Record from any mic,
+upload in pieces that survive network drops, play back, download, delete. Next: M3, transcription.
 
 ## Requirements
 
@@ -71,6 +71,36 @@ via OIDC (Keycloak, AD, MFA) works and is tested end to end. Next: M2, record an
    ```
 
 4. Open `https://<SITE_ADDRESS>` and log in as `admin` with the password you set.
+
+## Recording (M2)
+
+The home page is the recorder:
+
+1. Tick the consent box (text configurable with `CONSENT_NOTICE`).
+2. Click **Allow microphone** and pick the mic. Leave the browser
+   noise-suppression box **off** for conference mics like the XVF3800.
+3. Press **Record**, then **Pause / Resume**, then **Stop**.
+
+While recording, the browser sends a piece every `RECORDER_CHUNK_SECONDS`
+(default 10). Each piece stays in the browser until the server confirms it,
+so a network drop only delays the upload: the status line says "offline",
+recording continues, and the queue catches up when the network returns.
+Recordings are stored in the `darkside_audio` volume, never in the database
+or the container.
+
+- **Upload an existing file:** webm, ogg, opus, mp4, m4a, mp3, wav, flac, aac.
+- **Tab closed or browser crashed:** after `RECORDING_STALE_SECONDS` (default
+  10 min) with no new piece, the recording is kept as **interrupted** with
+  everything that arrived.
+- **Limits:** `MAX_RECORDING_SECONDS` (4 h), `USER_QUOTA_MB` (20 GB per user,
+  0 = unlimited), `MAX_UPLOAD_BYTES` (2 GB).
+- **Delete** moves a recording to the trash; it's removed for good after
+  `TRASH_RETENTION_DAYS` (30).
+- Only the owner can list, play, download or delete a recording. Not even
+  admins can.
+
+How it's tested (fake microphone, tone markers, network drops, pause, tab
+close, Safari-style MP4): [dev/recorder-test/README.md](dev/recorder-test/README.md).
 
 ## Certificates
 
@@ -338,5 +368,6 @@ server/alembic/          database migrations (applied on api start)
 server/tests/            pytest suite (Postgres)
 dev/auth-test/           SSO test harness: OpenLDAP + Keycloak + browser e2e (not deployed)
 dev/ad-test/             AD test harness: Samba AD DC + e2e of the direct AD login (not deployed)
+dev/recorder-test/       recorder e2e: fake mic + tone markers (runs in CI)
 secrets/                 secret files, api only (git-ignored except README)
 ```

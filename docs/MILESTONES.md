@@ -38,6 +38,15 @@ break-glass admin still works when the IdP is down. Production AD = Keycloak
 (or another IdP) configuration only, no app changes.
 
 ## M2 — Record and push
+
+**Status:** built. Browser-tested with a fake microphone (`dev/recorder-test`,
+also in CI): normal, 4 s network drop, flaky network, pause/resume, tab
+closed, existing-file upload, Safari-style MP4 chunks, other user locked out.
+Logged in as Samba AD users in the sandbox. Stereo kept (2 channels).
+**Still open for the owner's devices:** the 60-minute run, real iOS/Android,
+the real XVF3800 channel behaviour. Not built yet: per-recording channel
+choice (D22, needed in M3).
+
 - Mic picker (`enumerateDevices`), level meter, browser-DSP toggle (default off).
 - Consent notice before recording.
 - Chunked recording/upload with retry, pause/resume, Wake Lock.

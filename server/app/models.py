@@ -3,8 +3,10 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -113,3 +115,50 @@ class Setting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+
+class RecordingStatus:
+    RECORDING = "recording"  # chunks still arriving
+    UPLOADED = "uploaded"  # finalized: complete file on disk
+    INTERRUPTED = "interrupted"  # browser vanished; kept what arrived
+    FAILED = "failed"  # file unreadable (see error)
+
+
+class Recording(Base):
+    __tablename__ = "recordings"
+    __table_args__ = (Index("ix_recordings_user_created", "user_id", "created_at"),)
+
+    # Random UUID: not guessable, safe to put in URLs.
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(20), default=RecordingStatus.RECORDING)
+    source: Mapped[str] = mapped_column(String(10), default="browser")  # browser | upload
+    mime_type: Mapped[str] = mapped_column(String(100))
+    file_ext: Mapped[str] = mapped_column(String(10))
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    duration_seconds: Mapped[float | None] = mapped_column(Float)
+    channels: Mapped[int | None] = mapped_column(Integer)
+    sample_rate: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_chunk_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Soft delete: in the trash until purged after TRASH_RETENTION_DAYS.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RecordingChunk(Base):
+    """Bookkeeping for chunk uploads: makes PUTs idempotent and lets
+    finalize check that 0..n all arrived. The bytes live on disk."""
+
+    __tablename__ = "recording_chunks"
+
+    recording_id: Mapped[str] = mapped_column(
+        ForeignKey("recordings.id", ondelete="CASCADE"), primary_key=True
+    )
+    seq: Mapped[int] = mapped_column(Integer, primary_key=True)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
