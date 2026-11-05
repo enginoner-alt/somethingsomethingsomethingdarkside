@@ -220,13 +220,24 @@ def close_stale(db: Session, user_id: int | None = None) -> list[Recording]:
     keep the unbroken run of chunks from 0 and mark them "interrupted".
     Nothing is thrown away silently."""
     cutoff = utcnow() - timedelta(seconds=get_config().recording_stale_seconds)
-    q = select(Recording).where(Recording.status == RecordingStatus.RECORDING)
+    q = select(Recording.id).where(Recording.status == RecordingStatus.RECORDING)
     if user_id is not None:
         q = q.where(Recording.user_id == user_id)
     closed: list[Recording] = []
-    for rec in db.scalars(q).all():
+    for rec_id in db.scalars(q).all():
+        # Two requests (say, the list page and another tab) can get here at once:
+        # lock the row; if another request was closing it, this waits for it and
+        # then finds it already closed. One row at a time, so no deadlocks.
+        rec = db.scalar(
+            select(Recording)
+            .where(Recording.id == rec_id, Recording.status == RecordingStatus.RECORDING)
+            .with_for_update()
+        )
+        if rec is None:
+            continue
         last = rec.last_chunk_at or rec.created_at
         if last > cutoff:
+            db.commit()  # release the lock
             continue
         seqs = []
         for s in _received(db, rec):

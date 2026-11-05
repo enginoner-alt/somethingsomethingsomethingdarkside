@@ -299,3 +299,46 @@ def test_list_pages_and_search(alice):
     hit = alice.get("/api/recordings?limit=25&q=meeting 07")
     assert [r["title"] for r in hit.json()] == ["Meeting 07"]
     assert len(alice.get("/api/recordings").json()) == 30  # no limit: everything, as before
+
+
+def test_stale_recording_is_closed_once_when_two_requests_race(alice, db, webm, monkeypatch):
+    """Regression: the list page and another request both listing at once closed
+    the same stale recording twice (and the second auto-transcribe hit the
+    one-transcript-per-recording constraint: HTTP 500)."""
+    from sqlalchemy import select
+
+    from app.db import get_sessionmaker
+    from app.models import Transcript
+
+    rec = create(alice).json()
+    upload_all(alice, rec["id"], split(webm, 2))
+    row = db.get(Recording, rec["id"])
+    row.last_chunk_at = utcnow() - timedelta(hours=1)
+    db.commit()
+    import threading
+
+    from app import recordings
+
+    assembled = []
+    real_assemble = recordings._assemble
+
+    def counting(db_, rec_, *a, **kw):
+        assembled.append(rec_.id)
+        return real_assemble(db_, rec_, *a, **kw)
+
+    monkeypatch.setattr(recordings, "_assemble", counting)
+    # Another request is busy closing it: it holds the row lock...
+    with get_sessionmaker()() as other:
+        other.scalar(select(Recording).where(Recording.id == rec["id"]).with_for_update())
+        result = {}
+        listing = threading.Thread(target=lambda: result.update(r=alice.get("/api/recordings")))
+        listing.start()
+        listing.join(timeout=1.5)
+        assert listing.is_alive()  # ...so this listing waits instead of closing it too
+        recordings.close_stale(other)  # the other request finishes closing it
+        listing.join(timeout=30)
+    assert result["r"].status_code == 200
+    assert result["r"].json()[0]["status"] == "interrupted"
+    assert assembled == [rec["id"]]  # closed (audio assembled) exactly once
+    db.expire_all()
+    assert db.query(Transcript).filter_by(recording_id=rec["id"]).count() <= 1
