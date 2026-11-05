@@ -89,8 +89,17 @@ recorded in README.
 
 **Status:** built against the fake LLM (pulled forward together with M3):
 summary, meeting subject, speakers (with "use these names"), action items,
-decisions, free question; editable prompts; long transcripts in parts.
-**Not yet:** a real LLM, the transcript-edit change-check, GPU-sharing toggle.
+decisions; editable prompts; long transcripts in parts. Also built:
+- **Ask**: chats with follow-ups over one or more meetings, capped by the
+  admin's "max context per Ask chat".
+- **Transcript editing**: correct the text or speaker of any line; the page
+  says how many words changed and marks insights made from the older text,
+  with "run them again" (the user decides; no extra LLM call to judge the
+  diff, the word count proved enough).
+- **Banned languages** for automatic detection (e.g. never `az`, use `tr`).
+
+**Not yet:** a real LLM, the GPU-sharing toggle, personal (per-user)
+templates, LLM tags / meeting type.
 
 - Admin: LLM endpoints (URL, model, key, context size, purpose), GPU-sharing toggle.
 - Templates: global (admin) + personal (user); sensible defaults
@@ -105,7 +114,7 @@ GPU-sharing toggle verified with LLM on the same 4060 (no OOM).
 
 ## Later (not scheduled)
 - "Download all my data" zip; trash purge job verification.
-- Cross-recording search / Q&A.
+- Cross-recording search (Q&A over meetings you pick is done: Ask).
 - Voiceprint speaker suggestions (needs an embedding service, see D25).
 - Multiple workers.
 - DOCX export.

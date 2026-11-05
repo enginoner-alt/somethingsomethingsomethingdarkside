@@ -179,6 +179,9 @@ class Transcript(Base):
     channel: Mapped[str] = mapped_column(String(10), default="mix")
     error: Mapped[str | None] = mapped_column(Text)
     raw: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # the service's JSON, as received
+    # +1 on every change of the segments (manual edit or new transcription);
+    # insights remember the revision they were made from.
+    rev: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -195,6 +198,9 @@ class Segment(Base):
     speaker: Mapped[str | None] = mapped_column(String(50))  # label, e.g. SPEAKER_00
     text: Mapped[str] = mapped_column(Text)
     words: Mapped[list[Any] | None] = mapped_column(JSON)
+    # Set on the first manual edit: what the transcription service said.
+    original_text: Mapped[str | None] = mapped_column(Text)
+    original_speaker: Mapped[str | None] = mapped_column(String(50))
 
 
 class Speaker(Base):
@@ -227,6 +233,7 @@ class Insight(Base):
     data: Mapped[dict[str, Any] | None] = mapped_column(
         JSON
     )  # structured extras (speaker suggestions)
+    transcript_rev: Mapped[int | None] = mapped_column(Integer)  # Transcript.rev it was made from
     model: Mapped[str | None] = mapped_column(String(200))
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

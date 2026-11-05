@@ -519,3 +519,71 @@ def test_chats_are_private_and_need_finished_transcripts(alice, client, db, conf
         alice.post("/api/chats", json={"recording_ids": [a], "question": "x"}).json()["error"]
         == "chat_not_ready"
     )
+
+
+# --- editing the transcript ------------------------------------------------------------
+
+
+def test_edit_transcript_marks_insights_outdated_and_reverts(alice, db, configured):
+    (rec_id,) = transcribed(alice, db)
+    base = f"/api/recordings/{rec_id}"
+    tr = alice.get(f"{base}/transcript").json()["transcript"]
+    assert tr["rev"] == 1 and not tr["edited"]
+    alice.post(f"{base}/insights", json={"kind": "summary"})
+    drain(db, "llm")
+    [ins] = alice.get(f"{base}/insights").json()
+    assert ins["transcript_rev"] == 1
+
+    seg = tr["segments"][0]
+    other = next(
+        s["speaker"] for s in tr["segments"] if s["speaker"] and s["speaker"] != seg["speaker"]
+    )
+    r = alice.patch(
+        f"{base}/segments",
+        json={
+            "edits": [{"idx": seg["idx"], "text": seg["text"] + " Ekleme var.", "speaker": other}]
+        },
+    )
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["changed_words"] > 0 and out["total_words"] > out["changed_words"]
+    new = out["transcript"]
+    assert new["rev"] == 2 and new["edited"]
+    first = new["segments"][0]
+    assert first["text"].endswith("Ekleme var.") and first["speaker"] == other
+    assert first["original_text"] == seg["text"] and first["original_speaker"] == seg["speaker"]
+    # The summary was made from revision 1: the page shows it as outdated.
+    assert alice.get(f"{base}/insights").json()[0]["transcript_rev"] == 1
+    # Insights and Ask read the corrected text.
+    from app.insights import transcript_lines
+
+    lines, _ = transcript_lines(db, db.get(Recording, rec_id))
+    assert "Ekleme var." in lines[0]
+
+    # Saving the same thing again changes nothing (no new revision).
+    same = alice.patch(
+        f"{base}/segments", json={"edits": [{"idx": seg["idx"], "text": first["text"]}]}
+    )
+    assert same.json()["changed_words"] == 0 and same.json()["transcript"]["rev"] == 2
+    # Revert: back to what the service said; no longer marked edited.
+    back = alice.patch(f"{base}/segments", json={"edits": [{"idx": seg["idx"], "revert": True}]})
+    seg_back = back.json()["transcript"]["segments"][0]
+    assert seg_back["text"] == seg["text"] and seg_back["speaker"] == seg["speaker"]
+    assert not seg_back["edited"] and not back.json()["transcript"]["edited"]
+
+
+def test_edit_transcript_checks_input(alice, db, configured):
+    (rec_id,) = transcribed(alice, db)
+    base = f"/api/recordings/{rec_id}"
+    bad = alice.patch(f"{base}/segments", json={"edits": [{"idx": 999, "text": "x"}]})
+    assert bad.status_code == 400 and bad.json()["error"] == "bad_segment"
+    who = alice.patch(f"{base}/segments", json={"edits": [{"idx": 0, "speaker": "SPEAKER_99"}]})
+    assert who.status_code == 400 and who.json()["error"] == "bad_speaker"
+
+
+def test_new_transcription_bumps_revision(alice, db, configured):
+    (rec_id,) = transcribed(alice, db)
+    base = f"/api/recordings/{rec_id}"
+    alice.post(f"{base}/transcribe", json={"language": "en", "channel": "2"})
+    drain(db, "gpu")
+    assert alice.get(f"{base}/transcript").json()["transcript"]["rev"] == 2

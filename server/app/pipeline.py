@@ -115,6 +115,7 @@ def transcribe_job(db: Session, job: Job) -> dict:
         db.add(Speaker(recording_id=rec.id, label=label))
     tr.raw, tr.language = result, result.get("language") or tr.requested_language
     tr.status, tr.finished_at = "done", utcnow()
+    tr.rev = (tr.rev or 0) + 1  # new text: insights made from the old one are outdated
     if s.asr_diarize and not labels:
         tr.error = errors.encode("no_speakers")
     db.commit()

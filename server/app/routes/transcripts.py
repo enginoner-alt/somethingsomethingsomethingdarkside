@@ -1,5 +1,6 @@
 """Recording detail: transcript, speakers, insights (JSON API + page)."""
 
+import difflib
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -38,9 +39,21 @@ def transcript_dict(db: Session, rec: Recording) -> dict:
         "language": tr.language,
         "channel": tr.channel,
         "error": errors.decode(tr.error),
+        "rev": tr.rev,
+        "edited": any(s.original_text is not None or s.original_speaker is not None for s in segs),
         "speakers": [{"label": k, "name": v} for k, v in sorted(names.items())],
         "segments": [
-            {"start": s.start, "end": s.end, "speaker": s.speaker, "text": s.text} for s in segs
+            {
+                "idx": s.idx,
+                "start": s.start,
+                "end": s.end,
+                "speaker": s.speaker,
+                "text": s.text,
+                "edited": s.original_text is not None or s.original_speaker is not None,
+                "original_text": s.original_text,
+                "original_speaker": s.original_speaker,
+            }
+            for s in segs
         ],
     }
 
@@ -54,6 +67,7 @@ def insight_dict(ins: Insight) -> dict:
         "answer": ins.answer,
         "data": ins.data,
         "model": ins.model,
+        "transcript_rev": ins.transcript_rev,
         "error": errors.decode(ins.error),
         "created_at": ins.created_at.isoformat() if ins.created_at else None,
     }
@@ -71,6 +85,17 @@ class InsightBody(BaseModel):
 
 class SpeakersBody(BaseModel):
     names: dict[str, str]
+
+
+class SegmentEdit(BaseModel):
+    idx: int
+    text: str | None = None  # new text; None = keep
+    speaker: str | None = None  # an existing label; "" = no speaker; None = keep
+    revert: bool = False  # back to what the transcription service said
+
+
+class EditBody(BaseModel):
+    edits: list[SegmentEdit]
 
 
 @router.get("/recordings/{rec_id}")
@@ -145,6 +170,68 @@ def rename_speakers(
             by_label[label].name = (name or "").strip()[:100] or None
     db.commit()
     return transcript_dict(db, rec)["speakers"]
+
+
+def _words(text: str) -> list[str]:
+    return text.split()
+
+
+@router.patch("/api/recordings/{rec_id}/segments", dependencies=[Depends(verify_csrf_header)])
+def edit_segments(
+    rec_id: str,
+    body: EditBody,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_user)],
+):
+    """Correct the transcript by hand: text and/or speaker of some lines.
+    Answers how much changed, so the page can offer to run insights again."""
+    try:
+        rec = owned(db, user, rec_id)
+    except RecordingError as exc:
+        return error_response(exc)
+    tr = db.scalar(select(Transcript).where(Transcript.recording_id == rec.id))
+    if tr is None or tr.status != "done":
+        return JSONResponse({"error": "no_transcript", "message": "no finished transcript"}, 409)
+    segs = {s.idx: s for s in db.scalars(select(Segment).where(Segment.transcript_id == tr.id))}
+    labels = {s.speaker for s in segs.values() if s.speaker} | {
+        s.original_speaker for s in segs.values() if s.original_speaker
+    }
+    before = sum(len(_words(s.text)) for s in segs.values())
+    changed = 0
+    for e in body.edits:
+        seg = segs.get(e.idx)
+        if seg is None:
+            return JSONResponse({"error": "bad_segment", "message": f"no line {e.idx}"}, 400)
+        old_text, old_speaker = seg.text, seg.speaker
+        if e.revert:
+            new_text = seg.original_text if seg.original_text is not None else seg.text
+            new_speaker = seg.original_speaker if seg.original_speaker is not None else seg.speaker
+        else:
+            new_text = seg.text if e.text is None else " ".join(e.text.split())[:5000]
+            new_speaker = seg.speaker if e.speaker is None else (e.speaker or None)
+            if new_speaker is not None and new_speaker not in labels:
+                return JSONResponse(
+                    {"error": "bad_speaker", "message": f"unknown speaker {new_speaker!r}"}, 400
+                )
+        if (new_text, new_speaker) == (old_text, old_speaker):
+            continue
+        if seg.original_text is None and seg.original_speaker is None:
+            seg.original_text, seg.original_speaker = old_text, old_speaker
+        seg.text, seg.speaker = new_text, new_speaker
+        if (seg.text, seg.speaker) == (seg.original_text, seg.original_speaker):
+            seg.original_text = seg.original_speaker = None  # back to the service's version
+        a, b = _words(old_text), _words(new_text)
+        diff = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+        same = sum(m.size for m in diff.get_matching_blocks())
+        changed += max(len(a), len(b)) - same + (old_speaker != new_speaker) * len(b)
+    if changed:
+        tr.rev = (tr.rev or 0) + 1
+    db.commit()
+    return {
+        "changed_words": changed,
+        "total_words": before,
+        "transcript": transcript_dict(db, rec),
+    }
 
 
 @router.get("/api/recordings/{rec_id}/insights")

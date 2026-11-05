@@ -8,6 +8,8 @@
   const player = $("player");
   let speakers = {};
   let txDone = false;
+  let tx = null;          // the last transcript loaded
+  let editing = false;    // correcting the transcript by hand
 
   const badgeClass = (s) => (s === "done" ? "done" : s === "failed" ? "failed" : s === "none" ? "plain" : "running");
   const ts = (s) => dur(s);
@@ -39,12 +41,10 @@
 
     speakers = Object.fromEntries((tr.speakers || []).map((s) => [s.label, s.name]));
     renderSpeakers(tr.speakers || []);
+    tx = tr;
     const segs = tr.segments || [];
-    $("segments").replaceChildren(...segs.map((s) =>
-      el("div", { class: "seg", "data-start": s.start ?? "", onclick: () => seek(s.start) },
-        el("span", { class: "ts" }, ts(s.start)),
-        el("strong", { class: colour(s.speaker) }, who(s.speaker)),
-        el("span", { class: "text" }, s.text))));
+    if (!editing) renderSegments();
+    $("tx-edit").hidden = tr.status !== "done" || !segs.length || editing;
     if (!segs.length) {
       const msg = tr.status === "queued" || tr.status === "running" ? t("tx.working") : tr.status === "failed" ? "" : t("tx.none");
       if (msg) $("segments").replaceChildren(el("p", { class: "empty" }, msg));
@@ -55,6 +55,67 @@
     document.querySelectorAll("#insight-buttons button, #ask-form button, #ask-form input").forEach((b) => { b.disabled = !txDone; });
     if (!txDone && !$("insights").childElementCount) $("insights").replaceChildren(el("p", { class: "muted small" }, t("tx.insights_wait")));
   };
+  const editedNote = (s) => s.edited
+    ? el("span", { class: "edited", title: t("tx.edited_was", { text: s.original_text ?? s.text, speaker: who(s.original_speaker ?? s.speaker) }) }, t("tx.edited"))
+    : null;
+  const renderSegments = () => {
+    const segs = tx?.segments || [];
+    $("segments").classList.toggle("editing", editing);
+    $("segments").replaceChildren(...segs.map((s) => {
+      if (!editing) {
+        return el("div", { class: "seg", "data-start": s.start ?? "", "data-idx": s.idx, onclick: () => seek(s.start) },
+          el("span", { class: "ts" }, ts(s.start)),
+          el("strong", { class: colour(s.speaker) }, who(s.speaker), editedNote(s)),
+          el("span", { class: "text" }, s.text));
+      }
+      // Edit mode: speaker picker and text box per line; nothing seeks.
+      const labels = (tx.speakers || []).map((x) => x.label);
+      const pick = el("select", { "data-idx": s.idx, class: "seg-speaker", "aria-label": t("tx.speaker") },
+        el("option", { value: "" }, t("tx.unknown_speaker")),
+        ...labels.map((l) => el("option", { value: l, selected: l === s.speaker }, who(l))));
+      const box = el("textarea", { "data-idx": s.idx, class: "seg-text", rows: 1, "aria-label": t("tx.line_text", { ts: ts(s.start) }) });
+      box.value = s.text;
+      const fit = () => { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; };
+      box.addEventListener("input", fit);
+      requestAnimationFrame(fit);
+      const revert = s.edited ? el("button", { class: "link small", type: "button", onclick: () => saveEdits([{ idx: s.idx, revert: true }]) }, t("tx.revert")) : null;
+      return el("div", { class: "seg editing", "data-start": s.start ?? "", "data-idx": s.idx },
+        el("span", { class: "ts" }, ts(s.start)),
+        el("div", { class: "seg-edit" }, el("div", { class: "row" }, pick, revert), box));
+    }));
+  };
+  const setEditing = (on) => {
+    editing = on;
+    $("edit-bar").hidden = !on;
+    $("tx-edit").hidden = on;
+    renderSegments();
+    if (on) $("segments").querySelector("textarea")?.focus();
+  };
+  const collectEdits = () => (tx?.segments || []).flatMap((s) => {
+    const text = $("segments").querySelector(`textarea[data-idx="${s.idx}"]`)?.value;
+    const speaker = $("segments").querySelector(`select[data-idx="${s.idx}"]`)?.value;
+    const e = { idx: s.idx };
+    if (text != null && text.trim() !== s.text) e.text = text;
+    if (speaker != null && (speaker || null) !== (s.speaker || null)) e.speaker = speaker;
+    return Object.keys(e).length > 1 ? [e] : [];
+  });
+  const saveEdits = async (edits) => {
+    if (!edits.length) { setEditing(false); return; }
+    const res = await api("PATCH", `/api/recordings/${ID}/segments`, { edits });
+    if (!res.ok) { $("edit-msg").hidden = false; $("edit-msg").textContent = errText(res); return; }
+    const { changed_words: n, total_words: total } = res.data;
+    $("edit-msg").hidden = false;
+    $("edit-msg").textContent = n
+      ? t("tx.edit_saved", { n, total, pct: Math.max(1, Math.round((n / Math.max(total, 1)) * 100)) })
+      : t("tx.edit_nothing");
+    tx = res.data.transcript;
+    setEditing(false);
+    loadInsights();
+  };
+  $("tx-edit").addEventListener("click", () => { $("edit-msg").hidden = true; setEditing(true); });
+  $("edit-cancel").addEventListener("click", () => setEditing(false));
+  $("edit-save").addEventListener("click", () => saveEdits(collectEdits()));
+
   const seek = (start) => { if (player && start != null) { player.currentTime = start; player.play().catch(() => {}); } };
 
   const renderSpeakers = (list) => {
@@ -73,6 +134,7 @@
   $("tx-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const f = new FormData(ev.target);
+    if (tx?.edited && !confirm(t("tx.confirm_retranscribe"))) return;
     const res = await api("POST", `/api/recordings/${ID}/transcribe`, {
       language: f.get("language") || null, channel: f.get("channel") || null });
     if (!res.ok) { $("tx-error").hidden = false; $("tx-error").textContent = errText(res); return; }
@@ -86,14 +148,29 @@
     if (!res.ok) return;
     if (res.data.length) $("insights").replaceChildren(...res.data.map(renderInsight));
     else if (txDone) $("insights").replaceChildren(el("p", { class: "muted small" }, t("tx.insights_empty")));
+    // Insights made from an older version of the transcript (edited or redone since).
+    outdated = res.data.filter(isOutdated);
+    $("outdated-note").hidden = !outdated.length;
+    $("outdated-text").textContent = t("tx.outdated_n", { n: outdated.length });
     clearTimeout(insTimer);
     if (res.data.some((i) => i.status === "queued" || i.status === "running")) insTimer = setTimeout(loadInsights, 1500);
     else if (res.data.some((i) => i.kind === "subject")) loadTranscript(); // title may have changed
   };
+  let outdated = [];
+  const isOutdated = (i) => i.status === "done" && i.transcript_rev != null && tx && i.transcript_rev < tx.rev;
+  $("outdated-rerun").addEventListener("click", async () => {
+    // Replace each: queue it again on the corrected text, then drop the old answer.
+    for (const i of outdated) {
+      const res = await api("POST", `/api/recordings/${ID}/insights`, { kind: i.kind, question: i.question });
+      if (res.ok) await api("DELETE", `/api/insights/${i.id}`);
+    }
+    loadInsights();
+  });
   const renderInsight = (i) => {
     const head = el("div", { class: "head" },
       el("span", { class: "kind" }, t(`tx.kind_${i.kind}`)),
-      i.status !== "done" ? el("span", { class: `badge ${badgeClass(i.status)}` }, t(`tx.status_${i.status}`)) : null);
+      i.status !== "done" ? el("span", { class: `badge ${badgeClass(i.status)}` }, t(`tx.status_${i.status}`))
+        : isOutdated(i) ? el("span", { class: "badge queued", title: t("tx.outdated_hint") }, t("tx.outdated")) : null);
     const body = el("div", { class: "answer" });
     if (i.kind === "question" && i.question) body.append(el("p", { class: "q" }, i.question));
     if (i.status === "failed") {
@@ -111,7 +188,7 @@
       el("span", {}, date(i.created_at)), i.model ? el("span", {}, i.model) : null,
       el("button", { class: "link", onclick: () => ask(i.kind, i.question) }, t("tx.rerun")),
       el("button", { class: "link", onclick: async () => { await api("DELETE", `/api/insights/${i.id}`); loadInsights(); } }, t("rec.delete")));
-    return el("article", { class: "insight", "data-kind": i.kind, "data-status": i.status }, head, body, foot);
+    return el("article", { class: "insight", "data-kind": i.kind, "data-status": i.status, "data-outdated": isOutdated(i) ? "1" : null }, head, body, foot);
   };
   const ask = async (kind, question = null) => {
     const res = await api("POST", `/api/recordings/${ID}/insights`, { kind, question });

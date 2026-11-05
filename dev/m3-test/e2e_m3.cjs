@@ -125,6 +125,26 @@ const check = (ok, label, detail = "") => {
   await page.goto(recUrl);
   await page.waitForSelector(".seg");
 
+  // Correct the transcript by hand: insights made from the old text are flagged.
+  const firstText = (await page.textContent(".seg .text")).trim();
+  await page.click("#tx-edit");
+  await page.fill(".seg-text >> nth=0", `${firstText} (düzeltildi)`);
+  await page.click("#edit-save");
+  await page.waitForFunction(() => /Saved|Kaydedildi/.test(document.getElementById("edit-msg").textContent));
+  check((await page.textContent(".seg .text")).endsWith("(düzeltildi)"), "edit: corrected line saved");
+  await page.waitForSelector(".insight[data-outdated]");
+  const stale = (await page.$$(".insight[data-outdated]")).length;
+  check(stale >= 5 && !(await page.isHidden("#outdated-note")), `edit: ${stale} insights flagged as made from the older text`);
+  await page.click("#outdated-rerun");
+  await page.waitForFunction(() => !document.querySelector(".insight[data-outdated]")
+    && !document.querySelector(".insight[data-status=queued], .insight[data-status=running]"), null, { timeout: 60000 });
+  check(await page.isHidden("#outdated-note"), "edit: insights run again on the corrected text");
+  await page.reload();
+  await page.waitForSelector(".seg");
+  check((await page.textContent(".seg .text")).endsWith("(düzeltildi)") && (await page.$(".seg .edited")) !== null,
+    "edit: correction kept after reload, line marked as edited");
+  page.on("dialog", (d) => d.accept()); // "transcribing again replaces your corrections"
+
   // Transcribe again: channel 2 only, English.
   await page.click("details summary");
   await page.selectOption("#tx-form select[name=language]", "en");

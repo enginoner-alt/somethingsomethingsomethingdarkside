@@ -388,5 +388,21 @@
   "err.chat_no_meetings": "Pick at least one meeting.",
   "err.chat_not_ready": "A selected meeting has no finished transcript.",
   "err.chat_too_large": "Too much for one question: {used} of {limit} characters. Pick fewer meetings.",
-  "err.chat_busy": "Wait for the answer before asking again."
+  "err.chat_busy": "Wait for the answer before asking again.",
+  "tx.edit": "Edit transcript",
+  "tx.edit_hint": "Correct the text or the speaker of any line, then save.",
+  "tx.edit_cancel": "Cancel",
+  "tx.edit_save": "Save changes",
+  "tx.edit_saved": "Saved: {n} of {total} words changed ({pct}%).",
+  "tx.edit_nothing": "Nothing changed.",
+  "tx.edited": "edited",
+  "tx.edited_was": "Before your edit: {speaker}: {text}",
+  "tx.speaker": "Speaker",
+  "tx.line_text": "Text at {ts}",
+  "tx.revert": "undo my edit",
+  "tx.confirm_retranscribe": "Transcribing again replaces your corrections with a new transcript. Continue?",
+  "tx.outdated": "older text",
+  "tx.outdated_hint": "Made before the transcript was corrected or redone.",
+  "tx.outdated_n": "{n} insight(s) were made from an older version of the transcript.",
+  "tx.outdated_rerun": "Run them again"
 }

@@ -388,5 +388,21 @@
   "err.chat_no_meetings": "En az bir toplantı seçin.",
   "err.chat_not_ready": "Seçilen bir toplantının bitmiş dökümü yok.",
   "err.chat_too_large": "Tek soru için çok fazla: {used} / {limit} karakter. Daha az toplantı seçin.",
-  "err.chat_busy": "Yeniden sormadan önce yanıtı bekleyin."
+  "err.chat_busy": "Yeniden sormadan önce yanıtı bekleyin.",
+  "tx.edit": "Dökümü düzenle",
+  "tx.edit_hint": "Herhangi bir satırın metnini ya da konuşmacısını düzeltip kaydedin.",
+  "tx.edit_cancel": "Vazgeç",
+  "tx.edit_save": "Değişiklikleri kaydet",
+  "tx.edit_saved": "Kaydedildi: {total} kelimeden {n} tanesi değişti (%{pct}).",
+  "tx.edit_nothing": "Hiçbir şey değişmedi.",
+  "tx.edited": "düzenlendi",
+  "tx.edited_was": "Düzenlemeden önce: {speaker}: {text}",
+  "tx.speaker": "Konuşmacı",
+  "tx.line_text": "{ts} anındaki metin",
+  "tx.revert": "düzenlememi geri al",
+  "tx.confirm_retranscribe": "Yeniden dökmek, düzeltmelerinizi yeni bir dökümle değiştirir. Devam edilsin mi?",
+  "tx.outdated": "eski metin",
+  "tx.outdated_hint": "Döküm düzeltilmeden ya da yeniden yapılmadan önce üretildi.",
+  "tx.outdated_n": "{n} içgörü dökümün eski bir sürümünden üretildi.",
+  "tx.outdated_rerun": "Yeniden çalıştır"
 }

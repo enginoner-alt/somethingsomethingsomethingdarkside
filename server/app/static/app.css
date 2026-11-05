@@ -76,6 +76,8 @@
 }
 
 * { box-sizing: border-box; }
+/* `hidden` always wins over a component's own display (flex, grid, ...). */
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -413,6 +415,18 @@ body.has-nav main { margin-left: var(--side); }
   .ask-layout.has-chat .chat-list-col { display: none; }
   .ask-layout.no-chat .chat-list-col { order: 2; }
 }
+
+
+/* --- transcript editing ------------------------------------------------------------ */
+.edit-bar { display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.segments.editing .seg { cursor: default; }
+.seg.editing { grid-template-columns: 56px minmax(0, 1fr); }
+.seg-edit { display: flex; flex-direction: column; gap: 6px; }
+.seg-edit select { width: auto; padding: 5px 8px; font-size: 0.8rem; }
+.seg-edit textarea { min-height: 0; resize: none; overflow: hidden; font: 400 1rem/1.55 var(--serif); padding: 6px 8px; }
+.seg strong .edited { margin-left: 8px; font-weight: 500; font-size: 0.7rem; color: var(--gold); letter-spacing: 0.04em; text-transform: uppercase; }
+.outdated-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+#edit-msg { margin: 6px 0 10px; }
 
 /* --- phones -------------------------------------------------------------------------- */
 @media (max-width: 860px) {

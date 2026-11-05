@@ -23,7 +23,15 @@
       <div class="section-head">
         <h2>{{ t("tx.transcript") }}</h2>
         <span id="tx-status" class="badge"></span>
+        <span class="grow"></span>
+        <button class="quiet" id="tx-edit" hidden>{{ t("tx.edit") }}</button>
       </div>
+      <div class="edit-bar" id="edit-bar" hidden>
+        <span class="small muted grow">{{ t("tx.edit_hint") }}</span>
+        <button class="quiet" id="edit-cancel">{{ t("tx.edit_cancel") }}</button>
+        <button class="primary" id="edit-save">{{ t("tx.edit_save") }}</button>
+      </div>
+      <p id="edit-msg" class="notice small" role="status" hidden></p>
       <p id="tx-error" class="error" hidden></p>
       <details class="tx-again">
         <summary>{{ t("tx.again") }}</summary>
@@ -51,6 +59,10 @@
 
     <aside class="panel col col-insights">
       <h2>{{ t("tx.insights") }}</h2>
+      <div class="notice small outdated-note" id="outdated-note" hidden>
+        <span id="outdated-text"></span>
+        <button class="quiet" id="outdated-rerun">{{ t("tx.outdated_rerun") }}</button>
+      </div>
       <div class="chips" id="insight-buttons">
         <button data-kind="summary">{{ t("tx.kind_summary") }}</button>
         <button data-kind="subject">{{ t("tx.kind_subject") }}</button>

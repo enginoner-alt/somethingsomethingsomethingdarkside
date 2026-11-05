@@ -146,6 +146,8 @@ def run(db: Session, ins: Insight, s: ServicesSettings) -> None:
     the real question on the combined notes (reduce)."""
     rec = db.get(Recording, ins.recording_id)
     lines, lang = transcript_lines(db, rec)
+    tr = db.scalar(select(Transcript).where(Transcript.recording_id == rec.id))
+    ins.transcript_rev = tr.rev if tr else None
     language = LANGUAGE_NAMES.get(lang, lang)
     prompts = get_prompts(db)
     system = SYSTEM.format(language=language)
